@@ -4,6 +4,7 @@ from operator import or_
 import os
 import re
 from models.db import db
+from models.file import File
 from models.printers import Printer 
 
 from models.issues import Issue  # assuming the Issue model is defined in the issue.py file in the models directory
@@ -27,7 +28,12 @@ from app import printer_status_service
 
 class Job(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    file = db.Column(db.LargeBinary(16777215), nullable=True)
+    
+    # file = db.Column(db.LargeBinary(16777215), nullable=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('file.id'), nullable=True)
+    file = db.relationship('File', backref='job', uselist=False)
+
+    
     name = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False)
     date = db.Column(db.DateTime, default=lambda: datetime.now(
@@ -63,8 +69,8 @@ class Job(db.Model):
 
 
     
-    def __init__(self, file, name, printer_id, status, file_name_original, favorite, td_id, printer_name):
-        self.file = file 
+    def __init__(self, name, printer_id, status, file_name_original, favorite, td_id, printer_name):
+        # self.file = File(file)
         self.name = name 
         self.printer_id = printer_id 
         self.status = status 
@@ -211,7 +217,6 @@ class Job(db.Model):
             printer = Printer.query.get(printer_id)
 
             job = cls(
-                file=compressed_data,
                 name=name,
                 printer_id=printer_id,
                 status=status,
@@ -220,8 +225,13 @@ class Job(db.Model):
                 td_id = td_id, 
                 printer_name = printer.name 
             )
-
+            
+            file = File(file=compressed_data)
+            job.file = file
+        
             db.session.add(job)
+            db.session.add(file)
+            
             db.session.commit()
 
             return {"success": True, "message": "Job added to collection.", "id": job.id}
