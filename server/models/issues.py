@@ -23,6 +23,9 @@ class Issue(db.Model):
     def __init__(self, issue):
         self.issue = issue
 
+    """
+        Gets all issues from the database 
+    """
     @classmethod
     def get_issues(cls):
         try:
@@ -42,6 +45,9 @@ class Issue(db.Model):
                 500,
             )
 
+    """
+        Creates a new issue that the user will be able to assign to jobs
+    """
     @classmethod
     def create_issue(cls, issue):
         try:
@@ -55,7 +61,10 @@ class Issue(db.Model):
                 jsonify({"error": "Failed to add job. Database error"}),
                 500,
             )
-            
+   
+    """
+        Delete issue from database
+    """         
     @classmethod
     def delete_issue(cls, issue_id):
         try:
@@ -73,7 +82,10 @@ class Issue(db.Model):
                 jsonify({"error": "Failed to delete issue. Database error"}),
                 500,
             )
-    
+
+    """
+        Edit name of issue in database
+    """
     @classmethod
     def edit_issue(cls, issue_id, issueNew):
         try:
