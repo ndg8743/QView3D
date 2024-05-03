@@ -115,9 +115,7 @@ class Job(db.Model):
         try:
             query = cls.query
             
-            print("fromError: ", fromError)
             if(fromError==1):
-                print("here")
                 query = cls.query.filter_by(status="error")
             
             if printerIds:
@@ -594,8 +592,6 @@ class Job(db.Model):
         return new_eta
     
     def colorEta(self):
-        print("before ETA: ", self.getJobTime()[1])
-
         now = datetime.now()
         pause_time = self.getJobTime()[3]
         duration = now - pause_time
@@ -610,8 +606,6 @@ class Job(db.Model):
         return total_time
     
     def calculateColorChangeTotal(self):
-        print("before Total Time: ", self.getJobTime()[0])
-
         now = datetime.now()
         pause_time = self.getJobTime()[3]
         duration = now - pause_time
@@ -633,7 +627,6 @@ class Job(db.Model):
         current_app.socketio.emit('max_layer_height', {'job_id': self.id, 'max_layer_height': self.max_layer_height})
 
     def setCurrentLayerHeight(self, current_layer_height):
-        print("Current Layer Height: ", current_layer_height)
         self.current_layer_height = current_layer_height
         current_app.socketio.emit('current_layer_height', {'job_id': self.id, 'current_layer_height': self.current_layer_height})
 
@@ -657,10 +650,7 @@ class Job(db.Model):
             self.time_started = time_started
             current_app.socketio.emit('set_time_started', {'job_id': self.id, 'started': time_started}) 
 
-
     def setTime(self, timeData, index):
-        # timeData = datetime(y, m, d, h, min, s)
-        # print("TimeData: ", timeData, " Index: ", index)
         self.job_time[index] = timeData
         if index==0: 
             current_app.socketio.emit('set_time', {'job_id': self.id, 'new_time': timeData, 'index': index}) 

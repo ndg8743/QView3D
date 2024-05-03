@@ -43,8 +43,6 @@ def getJobs():
     fromError = request.args.get('fromError', default=0, type=int)
     
     countOnly = request.args.get('countOnly', default=0, type=int)
-    
-    print(fromError)
 
     try:
         res = Job.get_job_history(page, pageSize, printerIds, oldestFirst, searchJob, searchCriteria, searchTicketId, favoriteOnly, issueIds, startdate, enddate, fromError, countOnly)
@@ -384,8 +382,7 @@ def delete_job():
         
         # Retrieve job to delete & printer id 
         job = Job.findJob(job_id) 
-        printer_id = job.getPrinterId() 
-        print("ID: ", printer_id)
+        printer_id = job.getPrinterId()
         
         if printer_id != 0:
             # Retrieve printer object & corresponding queue
@@ -512,7 +509,6 @@ def startPrint():
         printerobject = findPrinterObject(printerid)
         queue = printerobject.getQueue()
         inmemjob = queue.getJobById(jobid)
-        print(inmemjob)
         inmemjob.setReleased(1)
         
         return jsonify({"success": True, "message": "Job started successfully."}), 200
@@ -530,7 +526,6 @@ def saveComment():
         # job = Job.findJob(jobid)
         res = Job.setComment(jobid, comment)
         return res 
-    
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
@@ -548,15 +543,11 @@ def downloadCSV():
         else:
             # Call the model method to get the CSV content
             res = Job.downloadCSV(0, jobids)
-
-        print(res)
         return res 
-
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
-
 @jobs_bp.route('/removeCSV', methods=["GET", "POST"])
 def removeCSV():
     try:
@@ -565,11 +556,9 @@ def removeCSV():
         if os.path.exists(csv_folder):
             shutil.rmtree(csv_folder)
             os.makedirs(csv_folder)
-            print("TempCSV folder recreated as an empty directory.")
         else:
             # Create the uploads folder if it doesn't exist
             os.makedirs(csv_folder)
-            print("TempCSV folder created successfully.")  
         
         return jsonify({"success": True, "message": "CSV file removed successfully."}), 200
 

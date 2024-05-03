@@ -102,7 +102,6 @@ class PrinterStatusService:
         
     def editName(self, printer_id, name):
         try: 
-            print("in thread")
             for thread in self.printer_threads:
                 if thread.printer.id == printer_id:    
                     printer = thread.printer
@@ -135,7 +134,7 @@ class PrinterStatusService:
                 # "colorChangeBuffer": printer.colorChangeBuffer
             }
             queue = printer.getQueue()
-            print("QUEUE: ", queue.getSize())
+            
             for job in queue: 
                 job_info = {
                     "id": job.id,

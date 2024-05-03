@@ -44,7 +44,6 @@ export function setupErrorSocket(printers: any) {
   socket.on('error_update', (data: any) => {
     if (printers) {
       const printer = printers.value.find((p: Device) => p.id === data.printerid)
-      console.log(printer)
       if (printer) {
         printer.error = data.error
       }
@@ -65,7 +64,6 @@ export function setupCanPauseSocket(printers: any) {
       console.error('printers or printers.value is undefined')
     }
   })
-  console.log('queue socket set up')
 }
 
 // *** JOBS ***
@@ -164,7 +162,6 @@ export function setupPortRepairSocket(printers: any) {
   socket.on('port_repair', (data: any) => {
     if (printers) {
       const printer = printers.value.find((p: Device) => p.id === data.printer_id)
-      console.log('printer device: ' + printer.device, ' data device: ' + data.device)
       printer.device = data.device
     } else {
       console.error('printers or printers.value is undefined')
