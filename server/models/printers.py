@@ -22,7 +22,7 @@ class Printer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     device = db.Column(db.String(50), nullable=False)
     description = db.Column(db.String(50), nullable=False)
-    hwid = db.Column(db.String(150), nullable=False)
+    hwid = db.Column(db.String(150), nullable=False) # hardware ID 
     name = db.Column(db.String(50), nullable=False)
     date = db.Column(
         db.DateTime,
@@ -31,17 +31,15 @@ class Printer(db.Model):
     )
     queue = None
     ser = None
-    # default setting on printer start. Runs initialization and status switches to "ready" automatically.
     status = None
-    # stopPrint = False
-    responseCount = 0  # if count == 10 & no response, set error
+    responseCount = 0  # if count == 10 & no response from printer, set status to error 
     error = ""
     extruder_temp = 0
     bed_temp = 0
-    canPause = 0
-    prevMes = ""
-    colorbuff = 0 
-    terminated = 0 
+    canPause = 0 # Flag that allows user to pause print (can't pause during printer calibraton stages)
+    prevMes = "" # Stores previous line sent to printer 
+    colorbuff = 0 # Color buffer; When this == 1 and status is color change, the color change sequence will be initiated. (Only when current layer finishes)
+    terminated = 0 # Set to 1 when the user does a "hard reset" of the thread in Registered View
 
     def __init__(self, device, description, hwid, name, status=status, id=None):
         self.device = device
@@ -59,23 +57,30 @@ class Printer(db.Model):
         self.prevMes=""
         self.colorbuff=0
         self.terminated = 0 
-        # self.colorChangeBuffer=0
-
+        
+        # If ID is specified, set ID 
         if id is not None:
             self.id = id
+            
         self.responseCount = 0
 
-    # general classes
+
+    """
+        Locate printer in database based on HWID. Returns printer object
+    """
     @classmethod
     def searchByDevice(cls, hwid):
         try:
-            # Query the database to find a printer by device
             printer = cls.query.filter_by(hwid=hwid).first()
             return printer is not None
         except SQLAlchemyError as e:
             print(f"Database error: {e}")
             return None
 
+
+    """
+        Duplicate method. Leaving for now because I don't remember where I called which function. 
+    """
     @classmethod
     def getPrinterByHwid(cls, hwid):
         try:
@@ -89,12 +94,27 @@ class Printer(db.Model):
             print(f"Database error: {e}")
             return None
 
+    """
+        Locate printer object based on PK
+    """
+    @classmethod
+    def findPrinter(cls, id):
+        try:
+            printer = cls.query.get(id)
+            return printer
+        except SQLAlchemyError as e:
+            print(f"Database error: {e}")
+            return (
+                jsonify({"error": "Failed to retrieve printer. Database error"}),
+                500,
+            )
+            
+    """
+        Register a new printer in the database. Return an error if already registered. Check by HWID. 
+    """
     @classmethod
     def create_printer(cls, device, description, hwid, name, status):
         try:                
-            # hwid_parts = hwid.split('-')  # Replace '-' with the actual separator
-            # hwid_without_location = '-'.join(hwid_parts[:-1])
-            
             printerExists = cls.searchByDevice(hwid)
             if printerExists:
                 printer = cls.query.filter_by(hwid=hwid).first()
@@ -103,16 +123,12 @@ class Printer(db.Model):
                     "message": "Printer already registered.",
                 }
             else:
-                # hwid_parts = hwid.split('-')  # Replace '-' with the actual separator
-                # hwid_without_location = '-'.join(hwid_parts[:-1])
-
                 printer = cls(
                     device=device,
                     description=description,
                     hwid=hwid,
                     name=name,
                     status=status,
-                    # date = datetime.now(get_localzone())
                 )
                 db.session.add(printer)
                 db.session.commit()
@@ -128,13 +144,14 @@ class Printer(db.Model):
                 500
             )
 
+
+    """ 
+        Retrieve all registered printers from database and return JSON 
+    """
     @classmethod
     def get_registered_printers(cls):
         try:
-            # Query the database to get all registered printers
             printers = cls.query.all()
-
-            # Convert the list of printers to a list of dictionaries
             printers_data = [
                 {
                     "id": printer.id,
@@ -143,7 +160,6 @@ class Printer(db.Model):
                     "hwid": printer.hwid,
                     "name": printer.name,
                     "status": printer.status,
-                    # Include timezone abbreviation
                     "date": f"{printer.date.strftime('%a, %d %b %Y %H:%M:%S')} {get_localzone().tzname(printer.date)}",
                 }
                 for printer in printers
@@ -158,6 +174,10 @@ class Printer(db.Model):
                 500,
             )
 
+    """
+        Get all ports connected to the machine. Append all ports that are 3D printers to an array and return so user can 
+        select from a dropdown menu in Registered Printers and register a new printer based on selected serial ports.
+    """
     @classmethod
     def getConnectedPorts(cls):
         ports = serial.tools.list_ports.comports()
@@ -170,13 +190,23 @@ class Printer(db.Model):
                 "description": port.description,
                 "hwid": hwid_without_location,
             }
-            # supportedPrinters = ["Original Prusa i3 MK3", "Makerbot"]
 
-            if (("original" in port.description.lower()) or ("prusa" in port.description.lower())) and (Printer.getPrinterByHwid(hwid_without_location) is None) :
+
+            if (("original" in port.description.lower()) or ("prusa" in port.description.lower())) and (Printer.getPrinterByHwid(hwid_without_location) is None) : # filtering out non-3D printers
                 printerList.append(port_info)
 
         return printerList
 
+
+    """
+        In Registered Printers view. Allows the user to view if the serial port the 3D printer is registered under is the 
+        same as the port it is currently connected to. 
+        
+        Also tells the user if the port the printer is registered under is now connected to a DIFFERENT registered 3D printer. 
+        
+        Not super necessary since we now check ports before printing, but it's a good diagnostic tool anyway to see if a registered printer 
+        is/is not connected. 
+    """
     @classmethod
     def diagnosePrinter(cls, deviceToDiagnose):  # deviceToDiagnose = port
         try:
@@ -204,23 +234,12 @@ class Printer(db.Model):
             print(f"Unexpected error: {e}")
             return jsonify({"error": "Unexpected error occurred"}), 500
 
-    @classmethod
-    def findPrinter(cls, id):
-        try:
-            printer = cls.query.get(id)
-            return printer
-        except SQLAlchemyError as e:
-            print(f"Database error: {e}")
-            return (
-                jsonify({"error": "Failed to retrieve printer. Database error"}),
-                500,
-            )
-
+    """
+        Closes serial port associated with selected printer and then deletes printer from database. 
+    """
     @classmethod
     def deletePrinter(cls, printerid):
         try:
-            # ser = serial.Serial(cls.query.get(printerid).device, 115200, timeout=1)
-            # if(ser and ser.isOpen()):
             ports = Printer.getConnectedPorts()
             for port in ports:
                 hwid = port["hwid"] # get hwid 
@@ -228,8 +247,6 @@ class Printer(db.Model):
                     ser = serial.Serial(port["device"], 115200, timeout=1)
                     ser.close()
                     break 
-                
-            # ser.close()
 
             printer = cls.query.get(printerid)
             db.session.delete(printer)
@@ -242,6 +259,9 @@ class Printer(db.Model):
                 500,
             )
 
+    """
+        Edits the name of the printer in the database. Name is also edited in the in-memory thread in PrinterStatusService model. 
+    """
     @classmethod
     def editName(cls, printerid, name):
         try:
@@ -256,19 +276,20 @@ class Printer(db.Model):
                 500,
             )
 
+    """
+        Edits port in the database for specified printer. Hardware ports are not static so we need to consistently update 
+        the port before printing. 
+    """
     @classmethod
     def editPort(cls, printerid, printerport):
         try:
             ports = Printer.getConnectedPorts()
             for port in ports:
                 hwid = port['hwid'] # get hwid 
-                # hwid_parts = hwid.split('-')  # Replace '-' with the actual separator
-                # hwid_without_location = '-'.join(hwid_parts[:-1])
                 if hwid == cls.query.get(printerid).hwid:
                     ser = serial.Serial(port["device"], 115200, timeout=1)
                     ser.close()
                     break 
-    # Your existing editPort code here...)
             printer = cls.query.get(printerid)
             printer.device = printerport
             db.session.commit()
@@ -283,29 +304,27 @@ class Printer(db.Model):
                 jsonify({"error": "Failed to update printer port. Database error"}),
                 500,
             )
-            
+ 
+    """
+        When the user is registering a printer, they can click the "move head" button to "home" the printer so they 
+        know which printer they are currently registering if they are selecting from a long array of ports. 
+    """    
     @classmethod 
     def moveHead(cls, device):
         ser = serial.Serial(device, 115200, timeout=1)
-        # message = "G91\nG1 Z10 F3000\nG90"
         message = "G28"
-         # Encode and send the message to the printer.
-        # time.sleep(1)
         ser.write(f"{message}\n".encode("utf-8"))
-            # Sleep the printer to give it enough time to get the instruction.
-            # time.sleep(0.1)
-            # Save and print out the response from the printer. We can use this for error handling and status updates.
-        # while True:
-            # logic here about time elapsed since last response
 
         response = ser.readline().decode("utf-8").strip()
         if("error" in response):
             return "none"
-            # if "ok" in response:
-            #     break
         ser.close()
         return 
-        
+       
+    """
+        Opens the serial port.
+        Sends GCode command to report extruder/bed temperatures. 
+    """ 
     def connect(self):
         try:
             self.ser = serial.Serial(self.device, 115200, timeout=10)
@@ -314,28 +333,43 @@ class Printer(db.Model):
             self.setError(e)
             return "error"
 
+    """
+        Closes serial port connection. 
+    """
     def disconnect(self):
         if self.ser:
-            # self.ser.write(f"M155 S0\n".encode("utf-8"))
             self.ser.close()
             self.setSer(None)
 
+    """ 
+        Resets printer. 
+    """
     def reset(self):
         self.sendGcode("G28")
         self.sendGcode("G92 E0")
 
-    # Function to send gcode commands
+    """
+        Function to send gcode commands to printer. 
+        
+        The terminated flag is set to 1 when the user does a hard reset of the printer. 
+        
+        If the server is recieving an empty response from the printer, and the previous message was NOT M602 (in a calibration sequence), 
+        add to the response count. Set the status to error if the printer has not responded after 10 attempts. 
+        
+        If there is an error in the response itself, set status to error. 
+        
+        Return bed/nozzle temperature updates. 
+        
+        Only break from loop when an "ok" response is received. 
+        
+    """
     def sendGcode(self, message):
         try:
-            # Encode and send the message to the printer.
             self.ser.write(f"{message}\n".encode("utf-8"))
-            # Sleep the printer to give it enough time to get the instruction.
-            # time.sleep(0.1)
-            # Save and print out the response from the printer. We can use this for error handling and status updates.
             while True:
                 if(self.terminated==1): 
                     return 
-                # logic here about time elapsed since last response
+                
                 response = self.ser.readline().decode("utf-8").strip()
                 if response == "": 
                     if self.prevMes == "M602":
