@@ -9,6 +9,7 @@ import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 
+// methods from the models to be used in the view
 const { jobhistory, getFavoriteJobs } = useGetJobs()
 const { getFileDownload } = useGetJobFile()
 const { getFile } = useGetFile()
@@ -20,8 +21,12 @@ const { assign } = useAssignIssue()
 const { assignComment } = useAssignComment()
 const { removeIssue } = useRemoveIssue()
 const { csv } = useDownloadCsv()
-const selectedIssues = ref<Array<number>>([])
 
+// router to navigate to other pages
+const router = useRouter();
+
+// variables used in the view
+const selectedIssues = ref<Array<number>>([])
 const selectedPrinters = ref<Array<Number>>([])
 const selectedJobs = ref<Array<Job>>([]);
 const deleteModalTitle = computed(() => `Deleting ${selectedJobs.value.length} job(s) from database!`);
@@ -41,8 +46,6 @@ let endDateString = ref<string>('');
 let everyJob = ref<Array<Job>>([])
 let filterApplied = ref(0)
 
-const router = useRouter();
-
 let displayJobs = ref<Array<Job>>([])
 let fetchedJobs = ref<Array<Job>>([])
 
@@ -59,7 +62,6 @@ const isImageVisible = ref(true)
 let page = ref(1)
 let totalJobs = ref(0)
 let totalPages = ref(1)
-// let selectAllCheckbox = ref(false);
 
 let modalTitle = ref('');
 let modalMessage = ref('');
@@ -78,8 +80,7 @@ const showText = ref(false)
 
 let filterDropdown = ref(false)
 
-
-// computed property that returns the filtered list of jobs. 
+// computed property that returns the filtered list of jobs 
 let filteredJobs = computed(() => {
     if (filter.value) {
         return displayJobs.value.filter(job => job.printer.includes(filter.value))
@@ -88,21 +89,17 @@ let filteredJobs = computed(() => {
     }
 })
 
-let offcanvasElement: HTMLElement | null = null;
-
+// sets issueList to the list of issues from the database
+// loads the jobs and total jobs into fetchedJobs and totalJobs
+// also gets favorite jobs
+// adds an event listener to close the dropdown when clicked outside
+// gets the modal element and adds an event listener to hide the gcode image modal
 onMounted(async () => {
     try {
         isLoading.value = true;
 
         const retrieveissues = await issues();
         issuelist.value = retrieveissues;
-
-        offcanvasElement = document.getElementById('offcanvasRight');
-
-        if (offcanvasElement) {
-            offcanvasElement.addEventListener('shown.bs.offcanvas', onShownOffcanvas);
-            offcanvasElement.addEventListener('hidden.bs.offcanvas', onHiddenOffcanvas);
-        }
 
         const printerIds = selectedPrinters.value.map(p => p).filter(id => id !== undefined) as number[];
 
@@ -133,27 +130,12 @@ onMounted(async () => {
     }
 });
 
+// removes the event listener
 onUnmounted(() => {
     document.removeEventListener('click', closeDropdown);
 });
 
-const onShownOffcanvas = () => {
-    offcanvasElement?.removeAttribute('tabindex');
-};
-
-const onHiddenOffcanvas = () => {
-    offcanvasElement?.setAttribute('tabindex', '-1');
-};
-
-onBeforeUnmount(() => {
-    // Cleanup event listeners when component is about to be unmounted
-    if (offcanvasElement) {
-        offcanvasElement.removeEventListener('shown.bs.offcanvas', onShownOffcanvas);
-        offcanvasElement.removeEventListener('hidden.bs.offcanvas', onHiddenOffcanvas);
-    }
-    document.removeEventListener('click', closeDropdown);
-});
-
+// watches for changes in the selectedPrinters and selectedIssues
 watchEffect(() => {
     if (selectedJob.value) {
         const issueName = selectedJob.value.error;
@@ -162,13 +144,15 @@ watchEffect(() => {
     }
 });
 
+// pushes the user to the submit job page with the job and printer as parameters
 const handleRerun = async (job: Job, printer: Device) => {
     await router.push({
-        name: 'SubmitJobVue', // the name of the route to SubmitJob.vue
-        params: { job: JSON.stringify(job), printer: JSON.stringify(printer) } // the job and printer to fill in the form
+        name: 'SubmitJobVue',
+        params: { job: JSON.stringify(job), printer: JSON.stringify(printer) }
     });
 }
 
+// pushes the user to the submit job page with the job as a parameter
 const handleEmptyRerun = async (job: Job) => {
     await router.push({
         name: 'SubmitJobVue',
@@ -176,6 +160,8 @@ const handleEmptyRerun = async (job: Job) => {
     })
 }
 
+// pagination function to change the page
+// refetches the jobs and total jobs
 const changePage = async (newPage: any) => {
     isLoading.value = true
     if (newPage < 1 || newPage > Math.ceil(totalJobs.value / pageSize.value)) {
@@ -186,14 +172,17 @@ const changePage = async (newPage: any) => {
     page.value = newPage
     const printerIds = selectedPrinters.value.map(p => p).filter(id => id !== undefined) as number[];
 
-    // Fetch jobs into `fetchedJobs` and total into `totalJobs`
+    // fetch jobs into `fetchedJobs`
     [fetchedJobs.value] = await jobhistory(page.value, pageSize.value, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
-    // Update `displayJobs` with the fetched jobs
+    // update displayJobs with the fetched jobs
     displayJobs.value = fetchedJobs.value;
 
     isLoading.value = false
 }
 
+// submits the filter based on the selected options
+// then fetches the jobs and total jobs based on the filter
+// sets the total pages based on the total jobs
 async function submitFilter() {
     isLoading.value = true;
     filterDropdown.value = false;
@@ -222,7 +211,6 @@ async function submitFilter() {
         searchCriteria.value = searchJob.value;
     }
 
-    // Get the total number of jobs first, without considering the page number
     [fetchedJobs.value, totalJobs.value] = await jobhistory(1, Number.MAX_SAFE_INTEGER, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value, 1);
 
     totalPages.value = Math.ceil(totalJobs.value / pageSize.value);
@@ -232,19 +220,17 @@ async function submitFilter() {
         page.value = totalPages.value;
     }
 
-    // Now fetch the jobs for the current page
     const [joblist] = await jobhistory(page.value, pageSize.value, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
     jobs.value = joblist;
 
     selectedJobs.value = [];
-    // selectAllCheckbox.value = false;
 
     isLoading.value = false;
 }
 
+// clears the filter and resets the page to 1
 function clearFilter() {
     page.value = 1;
-    // pageSize.value = 10;
 
     selectedPrinters.value = [];
 
@@ -270,12 +256,16 @@ function clearFilter() {
     submitFilter();
 }
 
+// function to ensure that at least one checkbox is checked
+// when deciding whether to search by job name or file name
 const ensureOneCheckboxChecked = () => {
     if (!searchByJobName.value && !searchByFileName.value) {
         searchByJobName.value = true;
     }
 }
 
+// function to delete the selected jobs
+// then fetches the jobs and total jobs based on the filter
 const confirmDelete = async () => {
     isLoading.value = true;
     const deletionPromises = selectedJobs.value.map(job => deleteJob(job));
@@ -283,13 +273,11 @@ const confirmDelete = async () => {
 
     const printerIds = selectedPrinters.value.map(p => p).filter(id => id !== undefined) as number[];
 
-    // Fetch jobs into `fetchedJobs`
     [fetchedJobs.value, totalJobs.value] = await jobhistory(page.value, pageSize.value, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value);
 
     displayJobs.value = fetchedJobs.value;
 
     selectedJobs.value = [];
-    // selectAllCheckbox.value = false;
 
     submitFilter();
 
@@ -297,17 +285,10 @@ const confirmDelete = async () => {
     isLoading.value = false;
 }
 
-// const selectAllJobs = () => {
-//     isLoading.value = true
-//     if (selectAllCheckbox.value) {
-//         const newSelectedJobs = filteredJobs.value.filter(job => !selectedJobs.value.includes(job) && job.status !== 'printing');
-//         selectedJobs.value = [...selectedJobs.value, ...newSelectedJobs];
-//     } else {
-//         selectedJobs.value = selectedJobs.value.filter(job => !filteredJobs.value.includes(job));
-//     }
-//     isLoading.value = false
-// }
-
+// computed property to check if all jobs are selected
+// in the table, there is a select all checkbox to select all jobs that are displayed
+// this computed property checks if all jobs are selected or not
+// and also sets all jobs to be selected if the user selects the select all checkbox
 const selectAllJobs = computed({
     get: () => selectedJobs.value.length > 0 && selectedJobs.value.length === filteredJobs.value.length,
     set: (value) => {
@@ -320,6 +301,8 @@ const selectAllJobs = computed({
     }
 })
 
+// clears space in the database
+// deletes jobs files (NOT THE JOB) if the job is older than 6 months
 async function clear() {
     isLoading.value = true
     await clearSpace()
@@ -327,31 +310,35 @@ async function clear() {
     isLoading.value = false
 }
 
+// opens the modal with the title, message, and action
 const openModal = (title: any, message: any, action: any) => {
     modalTitle.value = title;
     modalMessage.value = message;
     modalAction.value = action;
 }
 
+// favorite/unfavorite a job
 const favoriteJob = async (job: Job, fav: boolean) => {
+    isLoading.value = true;
     await favorite(job, fav);
     favoriteJobs.value = await getFavoriteJobs();
-
     jobs.value = jobs.value.map(j => {
         if (j.id === job.id) {
             j.favorite = fav;
         }
         return j;
     })
-
     jobToUnfavorite = null;
+    isLoading.value = false;
 }
 
+// moves the favorites offcanvas button based on if the offcanvas is open or not
 const toggleButton = () => {
     buttonTransform.value = buttonTransform.value === 0 ? -700 : 0;
     isOffcanvasOpen.value = !isOffcanvasOpen.value;
 }
 
+// opens the image viewer modal
 const openGCodeModal = async (job: Job, printerName: string) => {
     currentJob.value = job
     currentJob.value.printer = printerName
@@ -364,7 +351,8 @@ const openGCodeModal = async (job: Job, printerName: string) => {
     }
 }
 
-const setJob = async (job: Job) => {
+// sets the job and comments to the selected job
+const setJob = (job: Job) => {
     jobComments.value = job.comment || '';
     selectedJob.value = job;
 }
@@ -387,6 +375,7 @@ const doAssignIssue = async () => {
     selectedJob.value = undefined
 }
 
+// closes the dropdown if the user clicks outside of the dropdown
 const closeDropdown = (evt: any) => {
     if (filterDropdown.value && evt.target.closest('.dropdown-card') === null) {
         filterDropdown.value = false;
@@ -407,6 +396,8 @@ const doDownloadCsv = async () => {
     isLoading.value = false
 }
 
+// checks if the job is in the queue
+// returns true if the job is in the queue
 const jobInQueue = (job: Job) => {
     for (const printer of printers.value) {
         if (printer.queue) {
@@ -420,6 +411,7 @@ const jobInQueue = (job: Job) => {
     return false;
 }
 
+// makes the number input only accept numbers
 const onlyNumber = ($event: KeyboardEvent) => {
     let keyCode = $event.keyCode;
     if ((keyCode < 48 || keyCode > 57) && (keyCode < 96 || keyCode > 105) && keyCode !== 8) { // 48-57 are the keycodes for 0-9, 96-105 are for the numpad 0-9, 8 is for backspace
@@ -430,7 +422,15 @@ const onlyNumber = ($event: KeyboardEvent) => {
 </script>
 
 <template>
-    <!-- error handling modal -->
+    <!-- 
+        modal for assigning an issue to a job
+        the user can select an issue from the dropdown
+        and add comments to the job
+
+        the user can also unassign an issue by selecting the "Unassign Issue" option
+
+        if the user assigns an issue to a job, the job status will be set to Error
+     -->
     <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="assignIssueLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -440,7 +440,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                         selectedJob?.td_id
                     }}</h5>
                     <h6 class="modal-title" id="assignIssueLabel" style="padding-left:10px; line-height: 1;">{{
-                            selectedJob?.date }}</h6>
+                        selectedJob?.date }}</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
                         @click="selectedIssue = undefined; selectedJob = undefined;"></button>
                 </div>
@@ -479,7 +479,14 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
-    <!-- gcode image viewer modal -->
+    <!-- 
+        this modal is used to show the gcode image
+        it has two views, the image view and the viewer view
+        if the file has an image, it will show the image view
+        but no matter what, it will show the viewer view
+
+        both components gets the job as a prop
+     -->
     <div class="modal fade" id="gcodeImageModal" tabindex="-1" aria-labelledby="gcodeImageModalLabel"
         aria-hidden="true">
         <div :class="['modal-dialog', isImageVisible ? '' : 'modal-xl', 'modal-dialog-centered']">
@@ -505,9 +512,16 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
-    <!-- bootstrap off canvas to the right -->
-    <div class="offcanvas offcanvas-end" data-bs-backdrop="static" tabindex="-1" id="offcanvasRight"
-        aria-labelledby="offcanvasRightLabel" style="background-color: #b9b9b9;">
+    <!-- 
+        offcanvas to show the favorite jobs
+        the user can download the file, rerun the job, and unfavorite the job
+        if they unfavorite the job, a modal will appear to confirm the action
+
+        the button to topen and close it is not attatched to the offcanvas
+        it is a separate button that moves based on the offcanvas state
+     -->
+    <div class="offcanvas offcanvas-end" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+        id="offcanvasRight" aria-labelledby="offcanvasRightLabel" style="background-color: #b9b9b9;">
         <div class="offcanvas-header" style="background-color: #484848; color: #dbdbdb;">
             <div class="container-fluid">
                 <div class="row align-items-center">
@@ -543,7 +557,8 @@ const onlyNumber = ($event: KeyboardEvent) => {
                             :disabled="job.file_name_original.includes('.gcode:')">
                             <i class="fa-solid fa-arrow-rotate-right"></i>
                         </button>
-                        <ul class="dropdown-menu" aria-labelledby="printerDropdown">
+                        <ul class="dropdown-menu" aria-labelledby="printerDropdown"
+                            style="max-height: 200px; overflow-y: auto;">
                             <li v-for="printer in printers" :key="printer.id">
                                 <a class="dropdown-item" @click="handleRerun(job, printer)"
                                     data-bs-dismiss="offcanvas">{{ printer.name }}</a>
@@ -565,6 +580,35 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </button>
     </div>
 
+    <!-- 
+        this is the warning modal that appears when the user tries to unfavorite a job
+        when trying to unfavorite a job in the offcanvas
+     -->
+    <div class="modal fade" id="favoriteModal" tabindex="-1" aria-labelledby="favoriteModalLabel" aria-hidden="true"
+        data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="favoriteModalLabel">Unfavorite Job</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to unfavorite this job?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal"
+                        @click="favoriteJob(jobToUnfavorite!, false)">Unfavorite</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+        modal to download the csv file
+        will only have jobs based on the current filtration criteria
+        the user can download the csv file or close the modal
+     -->
     <div class="modal fade" id="csvModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -586,28 +630,9 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
-    <!-- modal to unfavorite a job in the off canvas -->
-    <div class="modal fade" id="favoriteModal" tabindex="-1" aria-labelledby="favoriteModalLabel" aria-hidden="true"
-        data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="favoriteModalLabel">Unfavorite Job</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to unfavorite this job?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal"
-                        @click="favoriteJob(jobToUnfavorite!, false)">Unfavorite</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- modal for delete and clear space -->
+    <!-- 
+        modal to confirm the deletion of jobs or to clear space
+     -->
     <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -630,6 +655,43 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
+    <!-- 
+        the main content of the page
+        contains the filter dropdown, csv button, clear space button, delete button, the table of jobs, and the pagination
+
+        filter dropdown contains the following:
+        - jobs per page
+        - devices
+        - issues
+        - search by ticket id
+        - search for jobs
+            - search by job name
+            - search by file name
+        - order by newest to oldest or oldest to newest
+        - date picker
+            - pick a singular date or a range
+        - favorites
+
+        all jobs are initially displayed from newest to oldest, in a table
+        each job has a row, with the following columns:
+        - ticket id
+        - printer
+        - job name
+        - file name
+        - final status
+        - date
+        - actions
+            - image viewer
+            - comments modal
+            - download file
+            - rerun job
+                - empty rerun if user clicks 'Rerun'
+
+        if there are no jobs, a message will be displayed
+
+        below the table, there is a pagination component
+        the user can change the page to view more jobs
+     -->
     <div class="container">
         <div class="row w-100" style="margin-bottom: 0.5rem;">
             <div class="col-1 text-start" style="padding-left: 0">
@@ -645,7 +707,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                                 Jobs per page, out of {{ totalJobs }}:
                             </label>
                             <input id="pageSize" type="number" v-model.number="pageSize" min="1" class="form-control"
-                            @keydown="onlyNumber($event)">
+                                @keydown="onlyNumber($event)">
                         </div>
                         <div class="my-2 border-top"
                             style="border-width: 1px; margin-left: -16px; margin-right: -16px;"></div>
@@ -805,8 +867,8 @@ const onlyNumber = ($event: KeyboardEvent) => {
                     <th style="width: 257px;">Date Completed</th>
                     <th style="width: 75px;">Actions</th>
                     <th style="width: 48px;" class="col-checkbox">
-                        <input class="form-check-input" type="checkbox"
-                            v-model="selectAllJobs" :disabled="filteredJobs.length === 0">
+                        <input class="form-check-input" type="checkbox" v-model="selectAllJobs"
+                            :disabled="filteredJobs.length === 0">
                     </th>
                 </tr>
             </thead>
