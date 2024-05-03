@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script name: HiAaronIly.sh
+# Script name: HiAaron.sh
 # Author: Lars, Jack, Olamide
 # Date: March 7, 2024
 # Description: This script installs the dependencies and runs the code. 
