@@ -653,7 +653,6 @@ export function useDownloadCsv() {
 export async function deleteCSVFromServer() {
   try {
     const response = await api(`removeCSV`)
-    console.log('DELETE RES ', response)
     return response
   } catch (error) {
     console.error(error)

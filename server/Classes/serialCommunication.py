@@ -6,7 +6,6 @@ import time
 def get3DPrinterList():
     # Get a list of all the connected serial ports.
     ports = serial.tools.list_ports.comports()
-    # print(ports)
     # Print out the list of ports.
     for port in ports:
         # Save the port and description to list. With key value pairs of port and description.
@@ -16,11 +15,7 @@ def get3DPrinterList():
         
         # Check if the printer is supported and if true add it to the list.
         # if port.description in supportedPrinters:
-        printerList.append(port)   
-
-        
-        # Print out the list of supported printers.
-        # print(f"Port: {port.device}, Descp: {port.description}")
+        printerList.append(port)
     # Return the list of supported printers.
     return printerList
 
@@ -56,26 +51,3 @@ def resetPrinter():
     sendGcode("G28")
     # Reset Extruder
     sendGcode("G92 E0")
-
-#####################################################################################################################
-
-# Basic structure to send a Gcode file.  I'll add class integration later.  Just wanted to get the basic structure down. 
-
-# Reset the printer.
-# resetPrinter()
-
-# Run the get3DPrinterList and Charlie's queue function here to get the serial port of the printer.
-# availablePrinters = get3DPrinterList()
-# Run Charlie's queue function here to get the serial port of the printer.
-# serialPort = "/dev/ttyACM0"
-# # # Select the serial port. 
-
-# ser = serial.Serial(serialPort, 115200, timeout=1)
-
-# # Send the path to the gcode file for printing. 
-# parseGcode("/test.gcode")
-# # # Reset the printer.
-# resetPrinter()
-# # Close the serial port connection.
-# ser.close()
-

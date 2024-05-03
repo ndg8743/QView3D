@@ -175,7 +175,6 @@ class Printer(db.Model):
             if (("original" in port.description.lower()) or ("prusa" in port.description.lower())) and (Printer.getPrinterByHwid(hwid_without_location) is None) :
                 printerList.append(port_info)
 
-                # print(port_info)
         return printerList
 
     @classmethod
@@ -394,8 +393,6 @@ class Printer(db.Model):
                     break
                 print(f"Command: {message}, Received: {response}")
         except Exception as e:
-            # self.setStatus("error")
-            print(e)
             self.setError(e)
             return "error"
 
@@ -448,7 +445,6 @@ class Printer(db.Model):
                     if(self.terminated==1): 
                         return 
                     
-                    # print("LINE: ", line, " STATUS: ", self.status, " FILE PAUSE: ", job.getFilePause())
                     if("layer" in line.lower() and self.status=='colorchange' and job.getFilePause()==0 and self.colorbuff==0):
                         self.setColorChangeBuffer(1)
 
@@ -527,7 +523,6 @@ class Printer(db.Model):
                         job.setTime(datetime.now(), 3)
                         # job.setTime(job.calculateTotalTime(), 0)
                         # job.setTime(job.updateEta(), 1)
-                        print("SENDING COLORCHANGE")
                         self.sendGcode("M600") # color change command
                         job.setTime(job.colorEta(), 1)
                         job.setTime(job.calculateColorChangeTotal(), 0)
@@ -562,26 +557,6 @@ class Printer(db.Model):
     # Function to send "ending" gcode commands
     def endingSequence(self, job=None):
         try:
-            # *** Ender 3 Pro ending sequence ***
-            # self.gcodeEnding("G91") # Relative positioning
-            # self.gcodeEnding("G1 E-2 F2700") # Retract a bit
-            # self.gcodeEnding("G1 E-2 Z0.2 F2400") # Retract and raise Z
-            # self.gcodeEnding("G1 X5 Y5 F3000") # Wipe out
-            # self.gcodeEnding("G1 Z10") # Raise Z more
-            # self.gcodeEnding("G90") # Absolute positioning
-            # self.gcodeEnding("G1 X0 Y220") # Present print
-            # self.gcodeEnding("M106 S0") # Turn-off fan
-            # self.gcodeEnding("M104 S0") # Turn-off hotend
-            # self.gcodeEnding("M140 S0") # Turn-off bed
-            # self.gcodeEnding("M84 X Y E") # Disable all steppers but Z
-
-            # *** Prusa i3 MK3 ending sequence ***
-            # self.gcodeEnding("M104 S0") # turn off extruder
-            # self.gcodeEnding("M140 S0") # turn off heatbed
-            # self.gcodeEnding("M107") # turn off fan
-            # self.gcodeEnding("G1 X0 Y210") # home X axis and push Y forward
-            # self.gcodeEnding("M84") # disable motors
-
             # *** Prusa MK4 ending sequence ***
             # self.gcodeEnding("{if layer_z < max_print_height}G1 Z{z_offset+min(layer_z+1, max_print_height)} F720 ; Move print head up{endif}")
             self.gcodeEnding("M104 S0")# ; turn off temperature
@@ -596,7 +571,6 @@ class Printer(db.Model):
             self.gcodeEnding("M900 K0")# ; reset LA
             self.gcodeEnding("M142 S36")# ; reset heatbreak target temp
             self.gcodeEnding("M84 X Y E")# ; disable motors   
-            # ; max_layer_z = [max_layer_z]
 
         except Exception as e:
             self.setError(e)
@@ -606,11 +580,6 @@ class Printer(db.Model):
         # self.connect()
         job = self.getQueue().getNext()  # get next job
         try:
-        # if self.getSer():
-            # self.responseCount = 0
-            # job.saveToFolder()
-            # path = job.generatePath()
-
             self.setStatus("printing")  # set printer status to printing
             self.sendStatusToJob(job, job.id, "printing")
 
@@ -633,17 +602,8 @@ class Printer(db.Model):
                     self.sendStatusToJob(job, job.id, "error")
             else: 
                 self.handleVerdict("misprint", job)    
-
-            # job.removeFileFromPath(path)  # remove file from folder after job complete
-        # WHEN THE USER CLEARS THE JOB: remove job from queue, set printer status to ready.
-        # else:
-        #     self.getQueue().deleteJob(job.id, self.id)
-        #     # self.setStatus("error")
-        #     self.setError("Printer not connected")
-        #     self.sendStatusToJob(job, job.id, "error")
             return
         except Exception as e:
-            print(e)
             self.setErrorMessage(e)
             self.getQueue().deleteJob(job.id, self.id)
             self.setStatus("error")
@@ -734,7 +694,6 @@ class Printer(db.Model):
 
     def setStatus(self, newStatus):
         try:
-            print("SETTING STATUS TO:", newStatus)
             if(self.status == "error" and newStatus!="error"): 
                 Printer.hardReset(self.id)
             
