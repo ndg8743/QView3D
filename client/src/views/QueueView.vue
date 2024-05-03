@@ -4,27 +4,36 @@ import { printers, type Device } from '../model/ports'
 import { useRerunJob, useRemoveJob, type Job, useMoveJob, useGetFile, useGetJobFile, isLoading } from '../model/jobs'
 import draggable from 'vuedraggable'
 import { toast } from '@/model/toast'
-import { useRouter } from 'vue-router'
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue'
 import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
 
+// methods from the models to be used in the view
 const { removeJob } = useRemoveJob()
 const { rerunJob } = useRerunJob()
 const { moveJob } = useMoveJob()
 const { getFile } = useGetFile()
 const { getFileDownload } = useGetJobFile()
 
+// used for checkboxes for deleting jobs
 const selectedJobs = ref<Array<Job>>([])
 
+// used for the modal
 let currentJob = ref<Job | null>(null)
 let isGcodeImageVisible = ref(false)
 const isImageVisible = ref(true)
 
+// colors for the status of the printer
 const primaryColor = ref('');
 const primaryColorActive = ref('');
 const successColorActive = ref('');
+
+// observer for the colors
+// needed this if the user is on this page while changing the colors
 let observer: MutationObserver;
 
+// when the page is loaded we use the observer to get the colors
+// we also get the modal and add an event listener to it
+// so when the modal is closed we change the visibility of the visible values
 onMounted(() => {
   isLoading.value = true
   observer = new MutationObserver(() => {
@@ -44,7 +53,8 @@ onMounted(() => {
   isLoading.value = false
 });
 
-
+// when unmounted we set each printers isQueueExpanded to false
+// and disconnect the observer
 onUnmounted(() => {
   for (const printer of printers.value) {
     printer.isQueueExpanded = false
@@ -52,12 +62,14 @@ onUnmounted(() => {
   observer.disconnect();
 })
 
+// observer for the colors
 watchEffect(() => {
   primaryColor.value = window.getComputedStyle(document.documentElement).getPropertyValue('--bs-primary-color').trim() || '#7561A9';
   primaryColorActive.value = window.getComputedStyle(document.documentElement).getPropertyValue('--bs-primary-color-active').trim() || '#51457C';
   successColorActive.value = window.getComputedStyle(document.documentElement).getPropertyValue('--bs-success-color-active').trim() || '#3e7776';
 });
 
+// if the user selects to rerun a job
 const handleRerun = async (job: Job, printer: Device) => {
   await rerunJob(job, printer)
 }
@@ -99,10 +111,14 @@ watch(printers, (printers) => {
   selectedJobs.value = printers.flatMap((printer) => printer.queue?.filter((job) => job.queue_selected) || [])
 }, { deep: true })
 
+// capitalize the first letter of the printers status
+// to be displayed on the accordion, solely for aesthetics
 function capitalizeFirstLetter(string: string | undefined) {
   return string ? string.charAt(0).toUpperCase() + string.slice(1) : ''
 }
 
+// colors for the status of the printer
+// displayed on the accordion, with different colors for different statuses
 function statusColor(status: string | undefined) {
   switch (status) {
     case 'ready':
@@ -120,34 +136,43 @@ function statusColor(status: string | undefined) {
   }
 }
 
+// jobs are draggable, this function is called when a job is placed after dragging
+// it updates the position of the job in the queue in the backend by calling the moveJob function
 const handleDragEnd = async (evt: any) => {
   const printerId = Number(evt.item.dataset.printerId)
   const arr = Array.from(evt.to.children).map((child: any) => Number(child.dataset.jobId))
   await moveJob(printerId, arr)
 }
 
+// checks if the job is in the queue
 const isInqueue = (evt: any) => {
   return evt.relatedContext.element.status === 'inqueue'
 }
 
-const openModal = async (job: Job, printerName: string, num: number, printer: Device) => {
+// opens the modal for the gcode image
+// setting the current job and printer
+const openModal = async (job: Job, printerName: string) => {
   currentJob.value = job
   currentJob.value.printer = printerName
-  if (num == 1) {
-    // isGcodeLiveViewVisible.value = true
-  } else if (num == 2) {
-    isGcodeImageVisible.value = true
-    if (currentJob.value) {
-      const file = await getFile(currentJob.value)
-      if (file) {
-        currentJob.value.file = file
-      }
+  isGcodeImageVisible.value = true
+  if (currentJob.value) {
+    const file = await getFile(currentJob.value)
+    if (file) {
+      currentJob.value.file = file
     }
   }
 }
 </script>
 
 <template>
+  <!-- 
+    this modal is used to show the gcode image
+    it has two views, the image view and the viewer view
+    if the file has an image, it will show the image view
+    but no matter what, it will show the viewer view
+
+    both components gets the job as a prop
+   -->
   <div class="modal fade" id="gcodeImageModal" tabindex="-1" aria-labelledby="gcodeImageModalLabel" aria-hidden="true">
     <div :class="['modal-dialog', isImageVisible ? '' : 'modal-xl', 'modal-dialog-centered']">
       <div class="modal-content">
@@ -172,6 +197,11 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
     </div>
   </div>
 
+  <!-- 
+    this modal is used to show the confirmation of removing jobs
+    it will show the amount of jobs that will be removed
+    and ask the user if they are sure they want to remove them
+   -->
   <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
     data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -198,6 +228,36 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
     </div>
   </div>
 
+  <!-- 
+    on the top of the view, there is a button to all jobs that are selected
+
+    below that, every printer has an accordion, displaying its name, status and the amount of jobs in the queue
+    when opened, it will display the jobs in the queue in a table
+    each job has:
+      - ticket id
+      - a split dropdown
+        - button to rerun the job to the same printer
+        - dropdown with options to rerun the job to another printer
+      - the position in the queue
+      - the job title
+      - the file name
+      - the date added
+      - the job status
+      - a dropdown with options to:
+        - show the gcode image
+        - download the file
+      - a checkbox to select the job to be removed
+      - a handle to drag the job in the queue
+
+    the table is draggable, so the user can change the order of the jobs in the queue
+    when the user changes the order, the handleDragEnd function is called
+    which updates the position of the job in the queue in the backend
+
+    at the top of the printers queues table, in the header, there is a checkbox
+    that selects all jobs in the queue or deselects all jobs in the queue
+
+    and for when there are no printers available, it will display a message to the user to register a printer
+   -->
   <div class="container">
     <div class="row w-100" style="margin-bottom: 0.5rem">
       <div class="col-2 text-start" style="padding-left: 0">
@@ -233,9 +293,9 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
                 </span>
               </span>
               <span v-if="printer.queue?.length != 1" style="position: absolute; right: 50px;">{{ printer.queue?.length
-      || 0 }} jobs in queue</span>
+                || 0 }} jobs in queue</span>
               <span v-if="printer.queue?.length == 1" style="position: absolute; right: 50px;">{{ printer.queue?.length
-      || 0 }} job in queue</span>
+                || 0 }} job in queue</span>
             </b>
           </button>
         </h2>
@@ -319,7 +379,7 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
                               <li>
                                 <a class="dropdown-item d-flex align-items-center" data-bs-toggle="modal"
                                   data-bs-target="#gcodeImageModal" v-if="printer.queue && printer.queue.length > 0"
-                                  @click="printer.name && openModal(job, printer.name, 2, printer)">
+                                  @click="printer.name && openModal(job, printer.name)">
                                   <i class="fa-solid fa-image"></i>
                                   <span class="ms-2">GCode Image</span>
                                 </a>

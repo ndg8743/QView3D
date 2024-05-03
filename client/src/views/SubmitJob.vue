@@ -7,17 +7,20 @@ import { toast } from '@/model/toast';
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue';
 import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
 
+// methods from the models to be used in the view
 const { addJobToQueue } = useAddJobToQueue()
 const { auto } = useAutoQueue()
 const { getFile } = useGetFile();
 
+// route to get the job and printer from the previous page
 const route = useRoute();
 
+// variables from the route if they exist
 const job = route.params.job ? JSON.parse(route.params.job as string) : null;
 const printer = route.params.printer ? JSON.parse(route.params.printer as string) : null;
 const isAsteriksVisible = ref(true)
 
-// Form reference
+// variables to be used in the view
 const form = ref<HTMLFormElement | null>(null);
 let isSubmitDisabled = false;
 
@@ -25,46 +28,6 @@ const isGcodeImageVisible = ref(false)
 const isImageVisible = ref(true)
 
 const filamentTypes = ['PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA', 'PVA', 'PCTG', 'PP', 'PC', 'CPE', 'PEBA', 'PVB', 'PLA TOUGH', 'METAL', 'PET']
-
-// file upload
-const handleFileUpload = (event: Event) => {
-    isLoading.value = true
-    const target = event.target as HTMLInputElement;
-    const uploadedFile = target.files ? target.files[0] : undefined;
-    if (uploadedFile && uploadedFile.name.length > 50) {
-        toast.error('The file name should not be longer than 50 characters');
-        target.value = ''
-        file.value = undefined
-        fileName.value = ''
-    } else {
-        file.value = uploadedFile
-        fileName.value = uploadedFile?.name || ''
-        name.value = fileName.value.replace('.gcode', '') || ''
-
-        if (file.value) {
-            getFilament(file.value).then(filamentType => {
-                filament.value = filamentType ? filamentType.toString() : '';
-            }).catch(() => {
-                filament.value = '';
-            });
-        } else {
-            filament.value = '';
-        }
-    }
-    isLoading.value = false
-}
-
-// validate quantity
-const validateQuantity = () => {
-    if (quantity.value < 1 && selectedPrinters.value.length > 0) {
-        quantity.value = selectedPrinters.value.length
-    }
-    if (quantity.value < selectedPrinters.value.length) {
-        toast.error('Quantity must be greater than or equal to the number of selected printers')
-        return false;
-    }
-    return true;
-}
 
 // fills printers array with printers that have threads from the database
 onMounted(async () => {
@@ -112,6 +75,73 @@ onMounted(async () => {
     }
 })
 
+// watches the selected printers and the quantity
+// so if the user selects three printers while the quantity is 1,
+// the quantity will be set to 3
+watch(selectedPrinters, () => {
+    if (quantity.value < selectedPrinters.value.length) {
+        quantity.value = selectedPrinters.value.length;
+    }
+});
+
+// watches the quantity and makes it so the quantity cannot be greater than 1000
+// if the user tries to input a number greater than 1000, it will set the quantity
+// to 1000 really fast and show a toast message
+// and also disables the submit button if the form is not valid
+watchEffect(() => {
+    if (quantity.value > 1000) {
+        quantity.value = 1000;
+        toast.error('Quantity cannot be greater than 1000');
+    }
+    isSubmitDisabled = !(file.value !== undefined && name.value.trim() !== '' && quantity.value > 0 && (quantity.value >= selectedPrinters.value.length || selectedPrinters.value.length == 0) && filament.value !== '');
+});
+
+// file upload handler
+// checks if the file name is longer than 50 characters, which is the limit
+// sets the file, file name, and name variables
+const handleFileUpload = (event: Event) => {
+    isLoading.value = true
+    const target = event.target as HTMLInputElement;
+    const uploadedFile = target.files ? target.files[0] : undefined;
+    if (uploadedFile && uploadedFile.name.length > 50) {
+        toast.error('The file name should not be longer than 50 characters');
+        target.value = ''
+        file.value = undefined
+        fileName.value = ''
+    } else {
+        file.value = uploadedFile
+        fileName.value = uploadedFile?.name || ''
+        name.value = fileName.value.replace('.gcode', '') || ''
+
+        if (file.value) {
+            getFilament(file.value).then(filamentType => {
+                filament.value = filamentType ? filamentType.toString() : '';
+            }).catch(() => {
+                filament.value = '';
+            });
+        } else {
+            filament.value = '';
+        }
+    }
+    isLoading.value = false
+}
+
+// validates the quantity
+// checks if the quantity is less than the number of selected printers,
+// if it is, it sets the quantity to the number of selected printers
+const validateQuantity = () => {
+    if (quantity.value < 1 && selectedPrinters.value.length > 0) {
+        quantity.value = selectedPrinters.value.length
+    }
+    if (quantity.value < selectedPrinters.value.length) {
+        toast.error('Quantity must be greater than or equal to the number of selected printers')
+        return false;
+    }
+    return true;
+}
+
+// only allows numbers to be inputted
+// checks if the key code is not a number or backspace
 const onlyNumber = ($event: KeyboardEvent) => {
     let keyCode = $event.keyCode;
     if ((keyCode < 48 || keyCode > 57) && (keyCode < 96 || keyCode > 105) && keyCode !== 8) { // 48-57 are the keycodes for 0-9, 96-105 are for the numpad 0-9, 8 is for backspace
@@ -119,7 +149,6 @@ const onlyNumber = ($event: KeyboardEvent) => {
     }
 }
 
-// sends job to printer queue
 const handleSubmit = async () => {
     isLoading.value = true
     let isFavoriteSet = false;
@@ -206,6 +235,8 @@ const handleSubmit = async () => {
     isAsteriksVisible.value = true;
 }
 
+// resets the values of the form
+// makes quantity 1 if there are no selected printers
 function resetValues() {
     selectedPrinters.value = [];
     // quantity.value = selectedPrinters.value.length;
@@ -223,20 +254,10 @@ function resetValues() {
     filament.value = '';
 }
 
-watch(selectedPrinters, () => {
-    if (quantity.value < selectedPrinters.value.length) {
-        quantity.value = selectedPrinters.value.length;
-    }
-});
-
-watchEffect(() => {
-    if (quantity.value > 1000) {
-        quantity.value = 1000;
-        toast.error('Quantity cannot be greater than 1000');
-    }
-    isSubmitDisabled = !(file.value !== undefined && name.value.trim() !== '' && quantity.value > 0 && (quantity.value >= selectedPrinters.value.length || selectedPrinters.value.length == 0) && filament.value !== '');
-});
-
+// computed property to check if all printers are selected
+// in the form, there is a select all checkbox to select all printers to print to
+// this computed property checks if all printers are selected or not
+// and also sets all printers to be selected if the user selects the select all checkbox
 const allSelected = computed({
     get: () => selectedPrinters.value.length > 0 && selectedPrinters.value.length === printers.value.length,
     set: (value) => {
@@ -251,16 +272,20 @@ const allSelected = computed({
     }
 });
 
+// when the user clicks the browse button, it triggers the file input
 const triggerFileInput = () => {
     const fileInput = document.getElementById('file') as HTMLInputElement;
     fileInput.click();
 }
 
+// sets the filament type
 const selectFilament = (type: string) => {
     filament.value = type
 }
 
-
+// gets the filament type from the gcode file
+// reads the file backwards and looks for the filament type
+// works for prusa slicer gcode files
 const getFilament = (file: File) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -283,6 +308,14 @@ const getFilament = (file: File) => {
 
 </script>
 <template>
+    <!-- 
+        this modal is used to show the gcode image
+        it has two views, the image view and the viewer view
+        if the file has an image, it will show the image view
+        but no matter what, it will show the viewer view
+
+        both components gets the file as a prop
+     -->
     <div class="modal fade" id="gcodeImageModal" tabindex="-1" aria-labelledby="gcodeImageModalLabel"
         aria-hidden="true">
         <div :class="['modal-dialog', isImageVisible ? '' : 'modal-xl', 'modal-dialog-centered']">
@@ -308,6 +341,20 @@ const getFilament = (file: File) => {
         </div>
     </div>
 
+    <!-- 
+        this is the form to submit a job
+        it has the following fields:
+        - printer selection
+        - file upload
+        - filament selection
+        - quantity
+        - ticket id
+        - priority
+        - favorite
+        - name
+
+        the form has a submit button that will add the job(s) to the queue(s)
+     -->
     <div class="container">
         <div class="card" style="border: 1px solid #484848; background: #d8d8d8;">
             <div class="card-body">

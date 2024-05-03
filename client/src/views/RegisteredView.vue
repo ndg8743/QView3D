@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { printers, useGetPorts, useRetrievePrintersInfo, useHardReset, useDeletePrinter, useNullifyJobs, useEditName, useRemoveThread, useEditThread, useDiagnosePrinter, useRepair, type Device, useRetrievePrinters } from '../model/ports'
+import { printers, useRetrievePrintersInfo, useHardReset, useDeletePrinter, useNullifyJobs, useEditName, useRemoveThread, useEditThread, useDiagnosePrinter, useRepair, type Device, useRetrievePrinters } from '../model/ports'
 import { isLoading } from '../model/jobs'
-import { useRouter } from 'vue-router'
 import { ref, onMounted } from 'vue';
 import { toast } from '../model/toast'
 import RegisterModal from '../components/RegisterModal.vue'
 import router from '@/router';
 
+// methods from the models to be used in the view
 const { retrieve } = useRetrievePrinters();
 const { retrieveInfo } = useRetrievePrintersInfo();
 const { hardReset } = useHardReset();
@@ -18,7 +18,8 @@ const { editThread } = useEditThread();
 const { diagnose } = useDiagnosePrinter();
 const { repair } = useRepair();
 
-let registered = ref<Array<Device>>([]) // Stores array of printers already registered in the system
+// variables to be used in the view
+let registered = ref<Array<Device>>([])
 let editMode = ref(false)
 let editNum = ref<number | undefined>(0)
 let newName = ref('')
@@ -26,33 +27,39 @@ let message = ref('')
 let showMessage = ref(false)
 let messageId = ref<number | undefined>(0)
 
+// variables for the modal
 let modalTitle = ref('');
 let modalMessage = ref('');
 let modalAction = ref('');
 const selectedPrinter = ref<Device | null>(null);
 
-// fetch list of connected ports from backend and automatically load them into the form dropdown 
+// onMounted, retrieve all printers, which returns all printers registered in the database,
+// and set the value of registered to the returned value
 onMounted(async () => {
     isLoading.value = true
-    const allPrinters = await retrieve(); // load all registered printers
+    const allPrinters = await retrieve();
     registered.value = allPrinters
     isLoading.value = false
 });
 
+// resets the printers thread
 const doHardReset = async (printer: Device) => {
     isLoading.value = true
     await hardReset(printer.id)
-    router.go(0)
+    router.go(0) // refresh the page
     isLoading.value = false
 }
 
+// deletes the printer from the database if the printer is not printing
+// and nullifies the printer_id in the jobs table
+// then refetches the printers and registered printers
 const doDelete = async (printer: Device) => {
     isLoading.value = true
     if (printer.status == "printing") {
         toast.error("Cannot deregister printer while status is printing. Please wait for the printer to finish")
     }
     const printerId = printer.id;
-    const foundPrinter = printers.value.find(p => p.id === printerId);    // code to find printer where printer.id is equal to the printer.id in the printers array
+    const foundPrinter = printers.value.find(p => p.id === printerId);
 
     if (foundPrinter?.status === "printing") {
         toast.error("Cannot deregister printer while status is printing. Please turn offline or wait for the printer to finish printing.")
@@ -85,10 +92,13 @@ const doDelete = async (printer: Device) => {
     // await removeThread(printer.id)
 }
 
+// rename the printer
+// then refetches the printers and registered printers
+// and resets the editMode, newName, and editNum
 const saveName = async (printer: Device) => {
     isLoading.value = true
-    await editThread(printer.id, newName.value.trim())
-    await editName(printer.id, newName.value.trim())
+    await editThread(printer.id, newName.value.trim()) // edits printer name in database
+    await editName(printer.id, newName.value.trim()) // edits printer name in the memory
     printer.name = newName.value.trim();
 
     printers.value = await retrieveInfo();
@@ -99,10 +109,12 @@ const saveName = async (printer: Device) => {
     editNum.value = undefined
 }
 
+// repairs the ports
+// used for failsafe
 const doRepair = async () => {
     isLoading.value = true
     await repair()
-    router.go(0)
+    router.go(0) // refresh the page
     isLoading.value = false
 }
 
@@ -116,12 +128,14 @@ const doDiagnose = async (printer: Device) => {
     isLoading.value = false
 }
 
+// clears the message for the printer when diagnosing
 const clearMessage = () => {
     showMessage.value = false
     messageId.value = 0
     message.value = ''
 }
 
+// opens the modal with the title, message, action, and printer
 const openModal = (title: any, message: any, action: any, printer: Device) => {
     modalTitle.value = title;
     modalMessage.value = message;
@@ -129,6 +143,7 @@ const openModal = (title: any, message: any, action: any, printer: Device) => {
     selectedPrinter.value = printer;
 };
 
+// toggles the message for the printer when diagnosing
 const toggleMessage = (printer: Device) => {
     if (messageId.value == printer.id && showMessage.value) {
         clearMessage()
@@ -138,12 +153,20 @@ const toggleMessage = (printer: Device) => {
     }
 }
 
+// closes the register modal
+// then refetches the registered printers
+// to update the view with the new printer
 const doCloseRegisterModal = async () => {
     registered.value = await retrieve();
 }
 
 </script>
 <template>
+    <!--
+        this is the general modal for the view
+        it is used for hard reset and deregistering the printer
+        which both require confirmation from the user
+    -->
     <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -166,6 +189,19 @@ const doCloseRegisterModal = async () => {
         </div>
     </div>
 
+    <!--
+        this is the view for the registered printers
+        it displays all the registered printers in the database in a card format,
+        3 accross in a row with however many rows needed to display all the printers
+        and allows the user to edit the printer name, hard reset the printer,
+        deregister the printer, and diagnose the printer
+
+        the user can also register a new printer by clicking the register button
+        which will open RegisterModal
+
+        the user can also repair the ports by clicking the repair ports button
+        this is used for failsafe
+    -->
     <div class="container">
         <button type="button" class="btn btn-primary mb-2" data-bs-toggle="modal" data-bs-target="#registerModal">
             Register Printer
@@ -219,7 +255,7 @@ const doCloseRegisterModal = async () => {
                                                 @click="toggleMessage(printer)">
                                                 <i class="fas fa-stethoscope"></i>
                                                 <span class="ms-2">{{ messageId == printer.id && showMessage ?
-                        'Clear Message' : 'Diagnose Printer' }}</span>
+                                                    'Clear Message' : 'Diagnose Printer' }}</span>
                                             </a>
                                         </li>
                                     </ul>
@@ -273,20 +309,6 @@ const doCloseRegisterModal = async () => {
     border: 1px solid #484848;
 }
 
-.register {
-    color: red;
-}
-
-.form-container {
-    border: 2px solid #333;
-    padding: 20px;
-    width: 300px;
-}
-
-.register {
-    color: red;
-}
-
 .form-container {
     border: 2px solid #333;
     padding: 20px;
@@ -294,20 +316,12 @@ const doCloseRegisterModal = async () => {
     margin-top: 20px;
 }
 
-.register {
-    color: red;
-    margin-bottom: 10px;
-    /* Add margin to the bottom */
-}
-
 .modal-dialog {
     max-width: 500px;
-    /* Adjust modal width */
 }
 
 .modal-content {
     background-color: #fff;
-    /* Change modal background color */
 }
 
 .card-body {
@@ -317,25 +331,20 @@ const doCloseRegisterModal = async () => {
 
 .card-body button {
     margin-bottom: 5px;
-    /* Add margin between buttons */
 }
 
 .card-body input[type="text"] {
     margin-bottom: 5px;
-    /* Add margin below input field */
 }
 
 .card-body h6 {
     margin-bottom: 5px;
-    /* Add margin below each line */
 }
 
 .message {
     color: red;
     margin-top: 10px;
-    /* Add margin to the top */
 }
-
 
 .register {
     color: red;
@@ -345,7 +354,6 @@ const doCloseRegisterModal = async () => {
 
 .register-form {
     margin-top: 10px;
-    /* Add margin to the top of the register form */
 }
 
 .register-form select {
@@ -363,7 +371,6 @@ const doCloseRegisterModal = async () => {
     border-radius: 5px;
     width: 100%;
     box-sizing: border-box;
-    /* Ensure input field width includes padding and border */
 }
 
 .register-form input[type="submit"] {
