@@ -13,20 +13,31 @@ class PrinterThread(Thread):
         self.printer = printer
 
 class PrinterStatusService:
-    # in order to access the app context, we need to pass the app to the PrinterStatusService, mainly for the websockets
+    
+    """
+        Store printer threads in a list 
+    """
     def __init__(self, app):
         self.app = app
-        self.printer_threads = []  # array of printer threads
+        self.printer_threads = []
 
+    """
+        Start a printer thread and assign its "target function" to the update_thread class. 
+        Thread daemon kills thread when main program exits. 
+    """
     def start_printer_thread(self, printer):
-        # also pass the app to the printer thread
         thread = PrinterThread(printer, target=self.update_thread, args=(printer, self.app)) 
-        thread.daemon = True #lets you kill the thread when the main program exits, allows for the server to be shut down
+        thread.daemon = True 
         thread.start()
         return thread
 
-    def create_printer_threads(self, printers_data, queue=Queue()):
-        # all printer statuses initialized to be 'online.' Instantly changes to 'ready' on initialization -- test with 'reset printer' command.
+
+    """
+        For all printers in the printers_data list, create a printer object and start a printer thread. 
+        This function is called on server start by app.py. 
+        Also appends the thread to the thread array. 
+    """
+    def create_printer_threads(self, printers_data):
         for printer_info in printers_data:
             printer = Printer(
                 id=printer_info["id"],
@@ -36,30 +47,41 @@ class PrinterStatusService:
                 name=printer_info["name"],
                 status='configuring',
             )
-            # queue.setToInQueue()
-            # printer.setQueue(queue)
             printer_thread = self.start_printer_thread(
                 printer
-            )  # creating a thread for each printer object
+            ) 
             self.printer_threads.append(printer_thread)
 
-        # creating separate thread to loop through all of the printer threads to ping them for print status
-        self.ping_thread = Thread(target=self.pingForStatus)
 
-    # passing app here to access the app context
+    """
+        This is the thread's target function. It stays here and listens for printer status updates the whole time 
+        the server is running. 
+                
+        For error handling, we have "response count" to keep track of the number of times the printer HAS NOT responded (response = "") and set an error after 10 times. 
+        We reset this variable when a new job is sent to printer. 
+        
+        When the printer status is "ready" and there is a job in the queue, the printer will 
+        print the next job in the queue. This functionality is in models/printers.py.
+    """
     def update_thread(self, printer, app):
-        with app.app_context():
+        with app.app_context(): # Flask needs "app context" in order to recognize the database
             while True:
-                time.sleep(2)
-                status = printer.getStatus()  # get printer status
-
-                queueSize = printer.getQueue().getSize() # get size of queue 
+                time.sleep(2) # slight buffer 
+                status = printer.getStatus()  
+                queueSize = printer.getQueue().getSize() 
                 printer.responseCount = 0 
                 if (status == "ready" and queueSize > 0):
-                    time.sleep(2) # wait for 2 seconds to allow the printer to process the queue
+                    time.sleep(2)
                     if status != "offline": 
                         printer.printNextInQueue()
 
+    """
+        This function is called by the UI to reset a printer thread. Passes a printer_id, deletes the thread, and 
+        creates it again based on printer data. 
+        
+        Sets a variable called "terminated" to 1. If the thread is "stuck" in its target function, it detects this 
+        terminated flag and returns. 
+    """
     def resetThread(self, printer_id):
         try: 
             for thread in self.printer_threads:
@@ -74,13 +96,16 @@ class PrinterStatusService:
                         "name": printer.name, 
                     }
                     self.printer_threads.remove(thread)
-                    self.create_printer_threads([thread_data], printer.getQueue())
+                    self.create_printer_threads([thread_data])
                     break
             return jsonify({"success": True, "message": "Printer thread reset successfully"})
         except Exception as e:
             print(f"Unexpected error: {e}")
             return jsonify({"success": False, "error": "Unexpected error occurred"}), 500
-        
+  
+    """
+        Loops through threads and deletes thread associated with printer_id parameter. 
+    """      
     def deleteThread(self, printer_id):
         try: 
             for thread in self.printer_threads:
@@ -99,7 +124,10 @@ class PrinterStatusService:
         except Exception as e:
             print(f"Unexpected error: {e}")
             return jsonify({"success": False, "error": "Unexpected error occurred"}), 500
-        
+     
+    """
+        Edits name of printer in-memory because the printer object exists both in the database and in-memory. 
+    """   
     def editName(self, printer_id, name):
         try: 
             for thread in self.printer_threads:
@@ -113,7 +141,9 @@ class PrinterStatusService:
             return jsonify({"success": False, "error": "Unexpected error occurred"}), 500
         
 
-    # this method will be called by the UI to get the printers that have a threads information
+    """
+        This function is called by the UI to retrieve printer info and queues to display in a JSON format. 
+    """
     def retrieve_printer_info(self):
         printer_info_list = []
         for thread in self.printer_threads:
@@ -164,23 +194,17 @@ class PrinterStatusService:
             
         return printer_info_list
 
+    """
+        Get method for thread array 
+    """
     def getThreadArray(self):
         return self.printer_threads
     
-    def pingForStatus(self):
-        """_summary_ pseudo code
-        for printer in threads:
-            status = printer.getStatus()
-            if status == printing:
-                GCODE for print status
-        """
-        pass
-
-    def getThreadArray(self):
-        return self.printer_threads
-    
+    """
+        When the user changes the order of the printers on Main View in the UI, the order of the backend 
+        array is changed as well. 
+    """
     def movePrinterList(self, printer_ids):
-        # printer_ids is a list of printer ids in the order they should be displayed
         new_thread_list = []
         for id in printer_ids:
             for thread in self.printer_threads:
