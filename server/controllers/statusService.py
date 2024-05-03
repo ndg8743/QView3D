@@ -29,9 +29,6 @@ def hardreset():
         data = request.get_json() # get json data 
         id = data['printerid']
         restore = data.get('restore', 0)  # default value is False
-        
-        print("RESTORE: ", restore)
-        print("ID: ", id)
         res = printer_status_service.resetThread(id)
         return res 
     except Exception as e:
