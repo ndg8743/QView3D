@@ -12,27 +12,40 @@ import shutil
 from flask_socketio import SocketIO
 from datetime import datetime, timedelta
 from sqlalchemy import text
-# moved this up here so we can pass the app to the PrinterStatusService
-# Basic app setup 
+
+"""
+This is the main entry point for the backend server. It initializes the Flask app,
+    
+"""
 app = Flask(__name__)
-app.config.from_object(__name__) # update application instantly 
+app.config.from_object(__name__) 
 
-# moved this before importing the blueprints so that it can be accessed by the PrinterStatusService
+
+"""
+Initializing web sockets 
+"""
 printer_status_service = PrinterStatusService(app)
-
-# Initialize SocketIO, which will be used to send printer status updates to the frontend
-# and this specific socketit will be used throughout the backend
 socketio = SocketIO(app, cors_allowed_origins="*", engineio_logger=False, socketio_logger=False, async_mode='threading') # Initialize SocketIO with the Flask app
-app.socketio = socketio  # Add the SocketIO object to the app object
+app.socketio = socketio 
 
-# IMPORTING BLUEPRINTS 
+
+"""
+ Importing blueprints for the controllers
+"""
 from controllers.ports import ports_bp
 from controllers.jobs import jobs_bp
 from controllers.statusService import status_bp, getStatus 
 from controllers.issues import issue_bp
 
+"""
+    Enabling CORS for the app
+"""
 CORS(app)
 
+
+"""
+    Handles preflight reqiests apart of CORS
+"""
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
@@ -40,7 +53,9 @@ def handle_preflight():
         res.headers['X-Content-Type-Options'] = '*'
         return res
 
-# start database connection
+"""
+    Load environment variables and initialize database/database migartion tool 
+"""
 load_dotenv()
 basedir = os.path.abspath(os.path.dirname(__file__))
 database_file = os.path.join(basedir, os.environ.get('SQLALCHEMY_DATABASE_URI'))
@@ -48,26 +63,30 @@ database_uri = 'sqlite:///' + database_file
 app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-
 migrate = Migrate(app, db)
 
-# # Register the display_bp Blueprint
+
+"""
+    Register blueprints 
+"""
 app.register_blueprint(ports_bp)
 app.register_blueprint(jobs_bp)
 app.register_blueprint(status_bp)
 app.register_blueprint(issue_bp)
 
+"""
+    On server start, retrieve registered printers from database & get JSON. 
+    Create printer threads based on registered printers. 
+    Create & empty "uploads" folder. Used for temp. file storage while print is printing. 
 
-# own thread
-with app.app_context():
+"""
+with app.app_context(): # On server start 
     try:
-        # Creating printer threads from registered printers on server start 
-        res = getRegisteredPrinters() # gets registered printers from DB 
-        data = res[0].get_json() # converts to JSON 
-        printers_data = data.get("printers", []) # gets the values w/ printer data
+        res = getRegisteredPrinters() 
+        data = res[0].get_json()
+        printers_data = data.get("printers", []) 
         printer_status_service.create_printer_threads(printers_data)
         
-        # Create in-memory uploads folder 
         uploads_folder = os.path.join('../uploads')
         tempcsv = os.path.join('../tempcsv')
 
@@ -88,11 +107,8 @@ with app.app_context():
     except Exception as e:
         print(f"Unexpected error: {e}")
             
-
+"""
+    Run sockets, start server 
+"""
 if __name__ == "__main__":
-    # If hits last line in GCode file: 
-        # query for status ("done printing"), update. Use frontend to update status to "ready" once user removes print from plate. 
-        # Before sending to printer, query for status. If error, throw error. 
-    # since we are using socketio, we need to use socketio.run instead of app.run
-    # which passes the app anyways
     socketio.run(app, port=8000, debug=True)  # Replace app.run with socketio.run
