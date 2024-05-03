@@ -43,7 +43,7 @@ def getJobs():
     fromError = request.args.get('fromError', default=0, type=int)
     
     countOnly = request.args.get('countOnly', default=0, type=int)
-
+    
     try:
         res = Job.get_job_history(page, pageSize, printerIds, oldestFirst, searchJob, searchCriteria, searchTicketId, favoriteOnly, issueIds, startdate, enddate, fromError, countOnly)
         return jsonify(res)
