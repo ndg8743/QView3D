@@ -111,6 +111,8 @@ def auto_queue():
         filament = request.form['filament']
         favoriteOne = False 
         status = 'inqueue' 
+        priority = request.form['priority']
+        
         if(favorite == 'true' and not favoriteOne):
             favorite = 1
             favoriteOne = True
@@ -127,7 +129,12 @@ def auto_queue():
         job.setFileName(file_name_pk) 
         job.setFilament(filament) 
 
-        findPrinterObject(printer_id).getQueue().addToBack(job, printer_id)  
+        if priority == 'true':
+            print("front")
+            findPrinterObject(printer_id).getQueue().addToFront(job, printer_id)
+        else:
+            print("back")
+            findPrinterObject(printer_id).getQueue().addToBack(job, printer_id)
         
         return jsonify({"success": True, "message": "Job added to printer queue."}), 200
     

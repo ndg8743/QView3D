@@ -2,10 +2,12 @@
 import { printers } from '../model/ports'
 import { selectedPrinters, file, fileName, quantity, priority, favorite, name, tdid, filament, useAddJobToQueue, useGetFile, useAutoQueue, isLoading } from '../model/jobs'
 import { ref, onMounted, watchEffect, computed, watch } from 'vue'
-import { useRoute } from 'vue-router';
+import { RouterLink, routerKey, useRoute } from 'vue-router';
 import { toast } from '@/model/toast';
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue';
 import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
+import router from '@/router';
+import { time } from 'console';
 
 // methods from the models to be used in the view
 const { addJobToQueue } = useAddJobToQueue()
@@ -180,6 +182,7 @@ const handleSubmit = async () => {
             }
         }
         resetValues()
+
     } else {
         let sub = validateQuantity()
         if (sub == true) {
@@ -226,8 +229,11 @@ const handleSubmit = async () => {
     } else {
         toast.error('Failed to add job to queue. Unexpected response.')
     }
+    setTimeout(() => {
+        router.go(0)}, 500);
+
     isLoading.value = false
-    isAsteriksVisible.value = true;
+    isAsteriksVisible.value = true
 }
 
 // resets the values of the form
