@@ -18,6 +18,9 @@ import serial.tools.list_ports
 # get data for jobs 
 jobs_bp = Blueprint("jobs", __name__)
 
+"""
+    Get all jobs from database with specified filters 
+"""  
 @jobs_bp.route('/getjobs', methods=["GET"])
 def getJobs():
     page = request.args.get('page', default=1, type=int)
@@ -51,97 +54,82 @@ def getJobs():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
-# add job to queue
+
+"""
+    Add job to in-memory queue and insert into the database. Add to front/back of queue depending on priority. 
+"""  
 @jobs_bp.route('/addjobtoqueue', methods=["POST"])
 def add_job_to_queue():
     try:
-        # retrieve job data 
-        file = request.files['file']  # Access file directly from request.files
+        file = request.files['file'] 
         file_name_original = file.filename
-        name = request.form['name']  # Access other form fields from request.form
+        name = request.form['name'] 
         printer_id = int(request.form['printerid'])
         favorite = request.form['favorite']
-        # favorite = 1 if _favorite == 'true' else 0
-        # quantity = request.form['quantity']
         td_id = int(request.form['td_id'])
         filament = request.form['filament']
         favoriteOne = False 
-
-        # for i in range(int(quantity)):
+        priority = request.form['priority']
         if(favorite == 'true' and not favoriteOne):
             favorite = 1
             favoriteOne = True
         else: 
             favorite = 0
-            
-        status = 'inqueue' # set status 
-        res = Job.jobHistoryInsert(name, printer_id, status, file, file_name_original, favorite, td_id) # insert into DB 
+        status = 'inqueue'
         
-        # retrieve job from DB
+        # Insert job into DB and return the PK. Retrieve the in-memory job object after making DB insertion. 
+        res = Job.jobHistoryInsert(name, printer_id, status, file, file_name_original, favorite, td_id) 
         id = res['id']
-        
         job = Job.query.get(id)
         
+        # Get the base name and extension of the file. Then, append the primary key to the name and set it to the 
+        # file_name_pk attribute. This is what we will name the file in the uploads folder while the job is printinh. 
         base_name, extension = os.path.splitext(file_name_original)
-
-        # Append the ID to the base name
         file_name_pk = f"{base_name}_{id}{extension}"
-        
-        job.setFileName(file_name_pk) # set unique in-memory file name 
-
+        job.setFileName(file_name_pk) 
         job.setFilament(filament) # set filament type
 
-        priority = request.form['priority']
-        # if priotiry is '1' then add to front of queue, else add to back
+        # Add to front/back of queue depending on priority 
         if priority == 'true':
             findPrinterObject(printer_id).getQueue().addToFront(job, printer_id)
         else:
             findPrinterObject(printer_id).getQueue().addToBack(job, printer_id)
                         
         return jsonify({"success": True, "message": "Job added to printer queue."}), 200
-    
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Basically the same exact function as above, but this time, the printer ID is not passed in and the job is 
+    sent to the printer that has the smallest queue. 
+"""
 @jobs_bp.route('/autoqueue', methods=["POST"])
 def auto_queue(): 
     try: 
-        file = request.files['file']  # Access file directly from request.files
+        file = request.files['file'] 
         file_name_original = file.filename
-        name = request.form['name']  # Access other form fields from request.form
-        # quantity = request.form['quantity']
-
+        name = request.form['name'] 
         favorite = request.form['favorite']
         td_id = request.form['td_id']
         filament = request.form['filament']
-
         favoriteOne = False 
-        # for i in range(int(quantity)):
-        status = 'inqueue' # set status 
-        printer_id = getSmallestQueue()
-        
+        status = 'inqueue' 
         if(favorite == 'true' and not favoriteOne):
             favorite = 1
             favoriteOne = True
         else: 
             favorite = 0
-        # favorite = 1 if _favorite == 'true' else 0
-        
+
+        printer_id = getSmallestQueue()
         res = Job.jobHistoryInsert(name, printer_id, status, file, file_name_original, favorite, td_id) # insert into DB 
         
         id = res['id']
-        
         job = Job.query.get(id)
-        
         base_name, extension = os.path.splitext(file_name_original)
-
-        # Append the ID to the base name
         file_name_pk = f"{base_name}_{id}{extension}"
-        
-        job.setFileName(file_name_pk) # set unique in-memory file name 
-
-        job.setFilament(filament) # set filament type
+        job.setFileName(file_name_pk) 
+        job.setFilament(filament) 
 
         findPrinterObject(printer_id).getQueue().addToBack(job, printer_id)  
         
@@ -151,61 +139,56 @@ def auto_queue():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
+"""
+    Route to duplicate an old job from the database into the in-memory queue. 
+"""
 @jobs_bp.route('/rerunjob', methods=["POST"])
 def rerun_job():
     try:
         data = request.get_json()
-        printerpk = data['printerpk'] # printer to rerun job on 
+        printerpk = data['printerpk'] 
         jobpk = data['jobpk']
-        
         rerunjob(printerpk, jobpk, "back")
         return jsonify({"success": True, "message": "Job added to printer queue."}), 200
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
-# route to insert job into database
+"""
+    I'm pretty sure we don't use this anymore 
+"""
 @jobs_bp.route('/jobdbinsert', methods=["POST"])
 def job_db_insert():
     try:
         jobdata = request.form.get('jobdata')
-        
-        jobdata = json.loads(jobdata)  # Convert jobdata from JSON to a Python dictionary
-
-        # Get the individual fields from jobdata
+        jobdata = json.loads(jobdata)  
         name = jobdata.get('name')
         printer_id = jobdata.get('printer_id')
         status = jobdata.get('status')
-        # file_name=jobdata.get("file_name")
         file_path=jobdata.get("file_path")
-
-        # Insert the job data into the database
         res = Job.jobHistoryInsert(name, printer_id, status, file_path)
-
         return "success"
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
- 
- # cancel queued job   
+
+"""
+ I don't think we use this anymore
+"""
 @jobs_bp.route('/canceljob', methods=["POST"]) 
 def remove_job():
     try:
-        # job has: printer id. job info.
-        # 0 = cancel job, 1 = clear job, 2 = fail job, 3 = clear job (but also rerun)
         data = request.get_json()
         jobpk = data['jobpk']
-        # Retrieve job to delete & printer id 
         job = Job.findJob(jobpk) 
         printerid = job.getPrinterId() 
-
         jobstatus = job.getStatus()
-        # retrieve printer object & corresponding queue
+        
         printerobject = findPrinterObject(printerid)
-        # printerobject.setStatus("complete")
         queue = printerobject.getQueue()
         inmemjob = queue.getJob(job)
-        if jobstatus == 'printing': # only change statuses, dont remove from queue 
+        
+        if jobstatus == 'printing': 
             printerobject.setStatus("complete")
         else: 
             queue.deleteJob(jobpk, printerid) 
@@ -218,28 +201,30 @@ def remove_job():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Route to cancel job(s). If the job is currently printing, then ONLY set the printer's status to "complete." This will 
+    make the printer break out of the parseGcode loop and set the job status to "cancelled."
 
- # cancel queued job   
+    If the job is not currently printing, simply remove the job from the queue and set the job status to "cancelled."
+
+    Also update the job status in the database. 
+"""
 @jobs_bp.route('/cancelfromqueue', methods=["POST"]) 
 def remove_job_from_queue():
     try:
-        # job has: printer id. job info.
-        # 0 = cancel job, 1 = clear job, 2 = fail job, 3 = clear job (but also rerun)
         data = request.get_json()
         jobarr = data['jobarr']
         
         for jobpk in jobarr:
-            # Retrieve job to delete & printer id 
             job = Job.findJob(jobpk) 
             printerid = job.getPrinterId() 
 
             jobstatus = job.getStatus()
-            # retrieve printer object & corresponding queue
             printerobject = findPrinterObject(printerid)
-            # printerobject.setStatus("complete")
             queue = printerobject.getQueue()
             inmemjob = queue.getJob(job)
-            if jobstatus == 'printing': # only change statuses, dont remove from queue 
+            
+            if jobstatus == 'printing':
                 printerobject.setStatus("complete")
             else: 
                 queue.deleteJob(jobpk, printerid) 
@@ -252,21 +237,34 @@ def remove_job_from_queue():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    This route is called when the user clicks one of the three buttons after a print is done: clear, clear & rerun, or fail. 
     
+    The job is located and so is the printer that corresponds with the printerid saved by the job. The job is 
+    removed from the queue. 
+    
+    If the key == 3, the user clicked fail. The job status is set to "error" and the printer status is set to "error." The error 
+    message is set to whatever the user commented on the job in the comments field. If they left no comments, its empty. 
+    
+    If the key == 2, the user clicked clear & rerun. The job is rerun and added to the front of the queue. The printer status is set to "ready" unless 
+    the user shut the printer offline. 
+    
+    If the key == 1, the user clicked clear. The printer status is set to "ready" unless the user shut the printer offline.
+"""   
 @jobs_bp.route('/releasejob', methods=["POST"])
 def releasejob(): 
     try: 
         data = request.get_json()
         jobpk = data['jobpk']
         key = data['key']
+        
         job = Job.findJob(jobpk) 
         printerid = job.getPrinterId() 
         printerobject = findPrinterObject(printerid)
         printerobject.error = ""
         queue = printerobject.getQueue()
 
-        queue.deleteJob(jobpk, printerid) # remove job from queue
-        
+        queue.deleteJob(jobpk, printerid)
         printerid = data['printerid']
         
         currentStatus = printerobject.getStatus()
@@ -274,24 +272,23 @@ def releasejob():
         if key == 3: 
             Job.update_job_status(jobpk, "error")
             printerobject.setError(job.comments)
-            printerobject.setStatus("error") # printer ready to accept new prints 
-            
+            printerobject.setStatus("error") 
         elif key == 2: 
             rerunjob(printerid, jobpk, "front")
-            
             if currentStatus!="offline":
-                printerobject.setStatus("ready") # printer ready to accept new prints 
-                
+                printerobject.setStatus("ready") 
         elif key == 1: 
             if currentStatus!="offline":
-                printerobject.setStatus("ready") # printer ready to accept new prints 
-            
+                printerobject.setStatus("ready") 
+
         return jsonify({"success": True, "message": "Job released successfully."}), 200
-    
     except Exception as e: 
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500  
     
+"""
+    I don't think we use this anymore
+"""
 @jobs_bp.route('/bumpjob', methods=["POST"])
 def bumpjob():
     try:
@@ -317,7 +314,10 @@ def bumpjob():
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
-    
+
+"""
+    Code to move items around in the queue on QueueView. 
+"""
 @jobs_bp.route('/movejob', methods=["POST"])
 def moveJob():
     try:
@@ -331,7 +331,10 @@ def moveJob():
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500   
-    
+  
+"""
+    Code to update the status of the job in memory and in the database. The job is NOT removed from the queue.
+"""  
 @jobs_bp.route('/updatejobstatus', methods=["POST"])
 def updateJobStatus():
     try:
@@ -344,15 +347,16 @@ def updateJobStatus():
         job = Job.findJob(job_id) 
         printerid = job.getPrinterId() 
         printerobject = findPrinterObject(printerid)
-        queue = printerobject.getQueue()
-        
-        # queue.deleteJob(job_id, printerid)
-        
+        # queue = printerobject.getQueue()
         return jsonify(res), 200
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
-    
+  
+"""
+    Code to update the status of the job in memory and in the database to error. 
+    The job is also removed from the queue. Used when user clicks "fail" on a print. 
+"""  
 @jobs_bp.route('/assigntoerror', methods=["POST"])
 def assignToError():
     try:
@@ -373,34 +377,33 @@ def assignToError():
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
-    
+  
+"""
+    Used to delete a job from the database and from the in-memory queue if it is still there. 
+"""  
 @jobs_bp.route('/deletejob', methods=["POST"])
 def delete_job():
     try:
         data = request.get_json()
         job_id = data['jobid']
-        
-        # Retrieve job to delete & printer id 
         job = Job.findJob(job_id) 
         printer_id = job.getPrinterId()
         
         if printer_id != 0:
-            # Retrieve printer object & corresponding queue
             printer_object = findPrinterObject(printer_id)
             queue = printer_object.getQueue()
-            
-            # Delete job from the queue
             queue.deleteJob(job_id, printer_id) 
-
-            # Delete job from the database
+            
         Job.delete_job(job_id)
-
         return jsonify({"success": True, "message": f"Job with ID {job_id} deleted successfully."}), 200
 
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
+"""
+    Set status of a printer object from frontend 
+"""
 @jobs_bp.route("/setstatus", methods=["POST"])
 def setStatus():
     try:
@@ -409,7 +412,6 @@ def setStatus():
         newstatus = data['status']
  
         printerobject = findPrinterObject(printer_id)
-        
         printerobject.setStatus(newstatus)
         
         return jsonify({"success": True, "message": "Status updated successfully."}), 200
@@ -418,6 +420,9 @@ def setStatus():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
+"""
+    Retrieve file from database and return it to the frontend if the user wants to download a past file 
+"""
 @jobs_bp.route('/getfile', methods=["GET"])
 def getFile():
     try:
@@ -431,6 +436,10 @@ def getFile():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Used when the user deregisters a printer. All FK's in the job table in the database that reference that printer 
+    are set to 0. 
+"""
 @jobs_bp.route('/nullifyjobs', methods=["POST"])
 def nullifyJobs():
     try: 
@@ -442,6 +451,10 @@ def nullifyJobs():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+""" 
+    Route that removes all files stored in the database that are >6 months old. The other job data is still saved 
+    in the database.
+"""
 @jobs_bp.route('/clearspace', methods=["GET"])
 def clearSpace(): 
     try: 
@@ -451,6 +464,9 @@ def clearSpace():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Return all favorited jobs
+"""
 @jobs_bp.route('/getfavoritejobs', methods=["GET"])
 def getFavoriteJobs():
     try:
@@ -460,6 +476,9 @@ def getFavoriteJobs():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+""" 
+    Mark a job as "favorited" or not.
+"""
 @jobs_bp.route('/favoritejob', methods=["POST"])
 def favoriteJob():
     try: 
@@ -473,6 +492,9 @@ def favoriteJob():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Assign an issue to a specific job.
+"""
 @jobs_bp.route('/assignissue', methods=["POST"])
 def assignIssue():
     try: 
@@ -487,6 +509,9 @@ def assignIssue():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Unassign an issue from a specific job.
+"""
 @jobs_bp.route('/removeissue', methods=["POST"])
 def removeIssue():
     try: 
@@ -500,6 +525,9 @@ def removeIssue():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    "Release" a print. Called when the user clicks Start Print. 
+"""
 @jobs_bp.route('/startprint', methods=["POST"])
 def startPrint(): 
     try: 
@@ -516,20 +544,24 @@ def startPrint():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected ersetupPortRepairSocketror occurred"}), 500
     
+"""
+    Assign a comment to a job 
+"""
 @jobs_bp.route('/savecomment', methods=["POST"])
 def saveComment(): 
     try: 
         data = request.get_json()
         jobid = data['jobid']
         comment = data['comment']
-        
-        # job = Job.findJob(jobid)
         res = Job.setComment(jobid, comment)
         return res 
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Download a CSV file of jobs in the database specified by an array of JobIDs specified in the frontend by the user. 
+"""
 @jobs_bp.route('/downloadcsv', methods=["GET", "POST"])
 def downloadCSV():
     try:
@@ -538,40 +570,43 @@ def downloadCSV():
         jobids = data.get('jobIds')
 
         if alljobsselected == 1:
-            # Call the model method to get the CSV content
             res = Job.downloadCSV(1)
         else:
-            # Call the model method to get the CSV content
             res = Job.downloadCSV(0, jobids)
         return res 
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    This function is called by the system once the user downloads the CSV file. The file is temporarily stored in the 
+    tempcsv file, sent to the frontend, and then removed. 
+"""
 @jobs_bp.route('/removeCSV', methods=["GET", "POST"])
 def removeCSV():
     try:
-        # Create in-memory uploads folder 
         csv_folder = os.path.join('../tempcsv')
         if os.path.exists(csv_folder):
             shutil.rmtree(csv_folder)
             os.makedirs(csv_folder)
         else:
-            # Create the uploads folder if it doesn't exist
             os.makedirs(csv_folder)
-        
         return jsonify({"success": True, "message": "CSV file removed successfully."}), 200
-
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
+"""
+    Lists all of the ports currently connected to the machine. If the port the printer is registered under does not match the  
+    port the printer is currently connected to, update the port in the database. We check this by comparing the hwid 
+    returned by the connected port and the hwid stored in the database. 
+"""
 @jobs_bp.route("/repairports", methods=["POST", "GET"])
 def repair_ports(): 
     try:
         ports = serial.tools.list_ports.comports()    
         for port in ports: 
-            hwid = port.hwid # get hwid 
+            hwid = port.hwid
             hwid_without_location = hwid.split(' LOCATION=')[0]
             printer = Printer.getPrinterByHwid(hwid_without_location)
             if printer is not None: 
@@ -584,6 +619,9 @@ def repair_ports():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
    
+"""
+    Retreieves the time array stored in the backend of a job. Stores ETA, total time in print, time started, and time paused.
+"""
 @jobs_bp.route("/refetchtimedata", methods=['POST', 'GET']) 
 def refetch_time(): 
     try: 
@@ -593,46 +631,49 @@ def refetch_time():
 
         printer = findPrinterObject(printerid)
         job = printer.getQueue().getNext()
-
         timearray = job.job_time 
-
         timejson = {
             'total': timearray[0], 
             'eta': timearray[1].isoformat(), 
             'timestart': timearray[2].isoformat(), 
             'pause': timearray[3].isoformat()
         }
-
         return jsonify(timejson) 
 
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500    
     
+"""
+    Locates the thread object that corresponds with the printer. 
+"""
 def findPrinterObject(printer_id): 
     threads = printer_status_service.getThreadArray()
     return list(filter(lambda thread: thread.printer.id == printer_id, threads))[0].printer  
 
+"""
+    Loops through all of the printer threads and return the printer with the smallest queue. 
+"""
 def getSmallestQueue():
     threads = printer_status_service.getThreadArray()
     smallest_queue_thread = min(threads, key=lambda thread: thread.printer.queue.getSize())
     return smallest_queue_thread.printer.id
     
+"""
+    Rerun a job by duplicating it from the database and adding it to the in-memory queue.
+"""
 def rerunjob(printerpk, jobpk, position):
-    job = Job.findJob(jobpk) # retrieve Job to rerun 
-    
-    status = 'inqueue' # set status 
-    file_name_original = job.getFileNameOriginal() # get original file name
-    favorite = job.getFileFavorite() # get favorite status
+    job = Job.findJob(jobpk) 
+    status = 'inqueue'
+    file_name_original = job.getFileNameOriginal()
+    favorite = job.getFileFavorite() 
     td_id = job.getTdId()
-    # Insert new job into DB and return new PK 
     res = Job.jobHistoryInsert(name=job.getName(), printer_id=printerpk, status=status, file=job.getFile(), file_name_original=file_name_original, favorite=favorite, td_id=td_id) # insert into DB 
     
     id = res['id']
     file_name_pk = file_name_original + f"_{id}" # append id to file name to make it unique
     
     rjob = Job.query.get(id)
-    
     base_name, extension = os.path.splitext(file_name_original)
 
     # Append the ID to the base name

@@ -6,10 +6,6 @@ from flask_cors import cross_origin
 from sqlalchemy.exc import SQLAlchemyError
 from flask import Blueprint, jsonify, request, make_response
 from models.printers import Printer
-# from app import printer_status_service
-# from models.jobs import Job
-# from models.PrinterStatusService import PrinterStatusService
-# from app import printer_status_service
 
 ports_bp = Blueprint("ports", __name__)
 
