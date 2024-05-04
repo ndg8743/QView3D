@@ -1,3 +1,4 @@
+// Code to run the Vue app
 import '@fortawesome/fontawesome-free/css/all.css'
 import './assets/main.css'
 import 'vue-toast-notification/dist/theme-default.css';
