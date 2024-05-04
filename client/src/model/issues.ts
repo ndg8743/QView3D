@@ -6,6 +6,9 @@ export interface Issue {
     issue: string
 }
 
+/*
+    Retrieves all issues created by user from the database so user can assign them to jobs 
+*/
 export function useGetIssues() {
     return {
         async issues() {
@@ -22,6 +25,9 @@ export function useGetIssues() {
     }
 }
 
+/*
+    Create a new issue 
+*/
 export function useCreateIssues() {
     return {
         async createIssue(issue: string) {
@@ -48,6 +54,9 @@ export function useCreateIssues() {
     }
 }
 
+/*
+    Assign an issue to a job
+*/
 export function useAssignIssue() {
     return {
         async assign(issueid: number, jobid: number) {
@@ -74,6 +83,9 @@ export function useAssignIssue() {
     }
 }
 
+/*
+    Delete a user-created issue 
+*/
 export function useDeleteIssue() {
     return {
         async deleteIssue(issue: Issue) {
@@ -101,6 +113,9 @@ export function useDeleteIssue() {
     }
 }
 
+/*
+    Edit the name of a user-created issue
+*/
 export function useEditIssue() {
     return {
         async editIssue(issueid: number | undefined, issuenew: string) {

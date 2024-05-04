@@ -28,8 +28,14 @@ export interface Device {
   colorChangeBuffer?: number
 }
 
+/*
+  Global variable to store the list of printers and printer queues based on in-memory thread data from backend 
+*/
 export let printers = ref<Device[]>([])
 
+/*
+  Get all connected serial ports. Only return ports that are connected to 3D printers. 
+*/
 export function useGetPorts() {
   return {
     async ports() {
@@ -43,6 +49,9 @@ export function useGetPorts() {
   }
 }
 
+/*
+  Register printer based on data collected from useGetPorts 
+*/
 export function useRegisterPrinter() {
   return {
     async register(printer: Device) {
@@ -69,6 +78,9 @@ export function useRegisterPrinter() {
   }
 }
 
+/*
+  Gets all registered printers from the database to display on Registered View 
+*/
 export function useRetrievePrinters() {
   return {
     async retrieve() {
@@ -82,7 +94,10 @@ export function useRetrievePrinters() {
   }
 }
 
-// gets the printers that have threads information from the server
+
+/*
+  Main function to retrieve thread data from backend and store it in the printers variable.
+*/
 export function useRetrievePrintersInfo() {
   return {
     async retrieveInfo() {
@@ -96,6 +111,9 @@ export function useRetrievePrintersInfo() {
   }
 }
 
+/*
+  Set status of printer 
+*/
 export function useSetStatus() {
   return {
     async setStatus(printerid: number | undefined, status: string) {
@@ -109,6 +127,9 @@ export function useSetStatus() {
   }
 }
 
+/*
+  Delete and recreate thread data for printer
+*/
 export function useHardReset() {
   return {
     async hardReset(printerid: number | undefined) {
@@ -135,6 +156,9 @@ export function useHardReset() {
   }
 }
 
+/*
+  If a printer is deregistered, set all FKs of jobs connected to that printer to null
+*/
 export function useNullifyJobs() {
   return {
     async nullifyJobs(printerid: number | undefined) {
@@ -161,6 +185,9 @@ export function useNullifyJobs() {
   }
 }
 
+/*
+  Delete printer from database
+*/
 export function useDeletePrinter() {
   return {
     async deletePrinter(printerid: number | undefined) {
@@ -174,6 +201,9 @@ export function useDeletePrinter() {
   }
 }
 
+/*
+  Delete in-memory thread data for printer
+*/
 export function useRemoveThread() {
   return {
     async removeThread(printerid: number | undefined) {
@@ -200,6 +230,9 @@ export function useRemoveThread() {
   }
 }
 
+/*
+  Edit name of printer in database 
+*/
 export function useEditName() {
   return {
     async editName(printerid: number | undefined, name: string) {
@@ -226,6 +259,9 @@ export function useEditName() {
   }
 }
 
+/*
+  Edit name of printer in thread data
+*/
 export function useEditThread() {
   return {
     async editThread(printerid: number | undefined, newname: string) {
@@ -239,6 +275,10 @@ export function useEditThread() {
   }
 }
 
+/*
+  Tells user if printer is connected to a serial port or not and if the port it is registered under 
+  is the port that the printer is currently connected to.
+*/
 export function useDiagnosePrinter() {
   return {
     async diagnose(device: string) {
@@ -265,6 +305,11 @@ export function useDiagnosePrinter() {
   }
 }
 
+/*
+    Lists all of the ports currently connected to the machine. If the port the printer is registered under does not match the  
+    port the printer is currently connected to, update the port in the database. We check this by comparing the hwid 
+    returned by the connected port and the hwid stored in the database. 
+*/
 export function useRepair() {
   return {
     async repair() {
@@ -291,6 +336,10 @@ export function useRepair() {
   }
 }
 
+/*
+    Route to send the "printer home" gcode command while the printer is registering a printer, so the user can tell 
+    which printer they have selected. 
+*/
 export function useMoveHead() {
   return {
     async move(port: string) {
@@ -317,6 +366,9 @@ export function useMoveHead() {
   }
 }
 
+/*
+  Method to change the order of printer threads so the user can rearrange the order of printers on the UI (Main view)
+*/
 export function useMovePrinterList() {
   return {
     async movePrinterList(printers: Device[]) {

@@ -1,13 +1,17 @@
 import io from 'socket.io-client';
 
-// socket.io setup for status updates, using the VITE_API_ROOT environment variable
-// moved this to myFetch.ts to make it easier to use in other files
+/*
+    This function is used to make fetch requests to server and specifies headers and body of the request.
+*/
+
 export const socket = io(import.meta.env.VITE_API_ROOT, {
     transports: ['websocket']
 })
 const API_ROOT = import.meta.env.VITE_API_ROOT as string;
 
 export function rest(url: string, body?: unknown, method?: string, headers?: HeadersInit){
+    
+    // Specify different headers if FormData is used.
     const isFormData = body instanceof FormData;
     const options: RequestInit = {
         method: method ?? (body ? "POST" : "GET"),

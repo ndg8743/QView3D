@@ -1,4 +1,3 @@
-// ts file to retrieve job information
 import { api } from './ports'
 import { toast } from './toast'
 import { type Device } from '@/model/ports'
@@ -8,7 +7,10 @@ import { ref } from 'vue'
 
 export let pageSize = ref(10)
 export let isLoading = ref(false)
-// Submit form data
+
+/*
+  Form data pre-filled when the user reruns a job 
+*/
 export const selectedPrinters = ref<Array<Device>>([])
 export const file = ref<File>()
 export const fileName = ref<string>('')
@@ -34,10 +36,8 @@ export interface Job {
   printerid: number
 
   td_id: number //store td_id of job
-
   max_layer_height?: number //store max layer height of job
   current_layer_height?: number //store current layer height of job
-
   errorid?: number
   error?: string // store issue name
 
@@ -67,8 +67,18 @@ export interface Job {
   queue_selected?: boolean
 }
 
+/*
+  This function is called whenever the user opens the printer's time information and also whenever the job_time array in the backend 
+  is updated. 
+
+  The job_server array stores all of the static time data from the backend (ETA, total time, time started, pause time).
+
+  The job_client object uses the static job_server data to calculate the dynamic time data (elapsed time, extra time, remaining time).
+*/
 export async function jobTime(job: Job, printers: any) {
   if (printers) {
+
+    // Instantiate job_client 
     if (!job.job_client) {
       job.job_client = {
         total_time: 0,
@@ -78,12 +88,14 @@ export async function jobTime(job: Job, printers: any) {
         remaining_time: NaN
       }
     }
+
+    // Instantiate job_server
     if (!job.job_server) {
       job.job_server = [0, '00:00:00', '00:00:00', '00:00:00']
 
+      // Fetch static time data from backend and update job_server. This is necessary because when the user reloads the page, 
+      // the in-memory job_server data is lost. This repopulates the job_server data so job_client can calculate the dynamic time data.
       for (const printer of printers.value) {
-        // let time_server = Array(4) // this saves all of the data from the backend.Only changed if there is a pause involved.
-        // Here 'printer' represents each Device object in the 'printers' array
         if (printer.queue && printer.queue.length != 0 && printer.queue[0].status != 'inqueue') {
           let timejson = await refetchtime(printer.id!, printer.queue[0].id)
           if (printer.queue[0].job_server) {
@@ -101,6 +113,7 @@ export async function jobTime(job: Job, printers: any) {
     const printerid = job.printerid
     const printer = printers.value.find((printer: { id: number }) => printer.id === printerid)
 
+    // Every second, update job time 
     const updateJobTime = () => {
       if (printer.status !== 'printing') {
         clearInterval(job.timer)
@@ -108,12 +121,13 @@ export async function jobTime(job: Job, printers: any) {
         return
       }
 
+      // total time = total time of job in seconds from backend * 1000 (convert to milliseconds, formatted in Main View JavaScript)
       let totalTime = job.job_server![0]
       job.job_client!.total_time = totalTime * 1000
 
+      // ETA = ETA of job in milliseconds from backend
       let eta =
         job.job_server![1] instanceof Date ? job.job_server![1].getTime() : job.job_server![1]
-      // job.job_client!.eta = eta + job.job_client!.extra_time
 
       // @ts-ignore
       job.job_client!.eta = eta
@@ -124,11 +138,11 @@ export async function jobTime(job: Job, printers: any) {
         printer.status === 'paused'
       ) {
         const now = Date.now()
-        const elapsedTime = now - new Date(job.job_server![2]).getTime()
+        const elapsedTime = now - new Date(job.job_server![2]).getTime() // Elapsed time = now - time started 
         job.job_client!.elapsed_time = Math.round(elapsedTime / 1000) * 1000
         if (!isNaN(job.job_client!.elapsed_time)) {
           if (job.job_client!.elapsed_time <= job.job_client!.total_time) {
-            job.job_client!.remaining_time =
+            job.job_client!.remaining_time = // Remaining time = total time - elapsed time 
               job.job_client!.total_time - job.job_client!.elapsed_time
           }
         }
@@ -136,7 +150,7 @@ export async function jobTime(job: Job, printers: any) {
 
       if (job.job_client!.elapsed_time > job.job_client!.total_time) {
         //@ts-ignore
-        job.job_client!.extra_time = Date.now() - eta
+        job.job_client!.extra_time = Date.now() - eta // Extra time = now - eta 
       }
 
       // Update elapsed_time after the first second
@@ -155,8 +169,10 @@ export async function jobTime(job: Job, printers: any) {
   }
 }
 
+/*
+  Time socket. Retrieves job_server data from backend and listens for updates. 
+*/
 export function setupTimeSocket(printers: any) {
-  // Always set up the socket connection and event listener
   socket.on('set_time', (data: any) => {
     if (printers) {
       const job = printers.value
@@ -187,6 +203,9 @@ export function setupTimeSocket(printers: any) {
   })
 }
 
+/*
+  Refetches job_server data from backend. Called by jobTime function.
+*/
 async function refetchtime(printerid: number, jobid: number) {
   try {
     const response = await api('refetchtimedata', { printerid, jobid })
@@ -197,6 +216,9 @@ async function refetchtime(printerid: number, jobid: number) {
   }
 }
 
+/*
+
+*/
 export function download(
   action: string,
   body?: unknown,
@@ -210,6 +232,9 @@ export function download(
   })
 }
 
+/*
+  Retrieve all jobs to display in Job History based on filter data 
+*/
 export function useGetJobs() {
   return {
     async jobhistory(
@@ -249,6 +274,9 @@ export function useGetJobs() {
   }
 }
 
+/*  
+  Update job status / assign status to error 
+*/
 export function useUpdateJobStatus() {
   return {
     async updateJobStatus(jobid: number, status: string) {
@@ -263,6 +291,9 @@ export function useUpdateJobStatus() {
   }
 }
 
+/*
+  Add job to queue 
+*/
 export function useAddJobToQueue() {
   return {
     async addJobToQueue(job: FormData) {
@@ -282,6 +313,9 @@ export function useAddJobToQueue() {
   }
 }
 
+/*
+  Auto-queue job (send to printer with smallest queue)
+*/
 export function useAutoQueue() {
   return {
     async auto(job: FormData) {
@@ -301,7 +335,9 @@ export function useAutoQueue() {
   }
 }
 
-// function to duplicate and rerun job
+/*
+  Pass the job PK you'd like to rerun. This is located in the database & duplicated to the specified printer. 
+*/
 export function useRerunJob() {
   return {
     async rerunJob(job: Job | undefined, printer: Device) {
@@ -309,8 +345,7 @@ export function useRerunJob() {
         let printerpk = printer.id
         let jobpk = job?.id
 
-        const response = await api('rerunjob', { jobpk, printerpk }) // pass rerun job the Job object and desired printer
-        // const response = {"success": true, "message": "Job rerun successfully"}
+        const response = await api('rerunjob', { jobpk, printerpk }) 
         if (response) {
           if (response.success == false) {
             toast.error(response.message)
@@ -332,30 +367,12 @@ export function useRerunJob() {
   }
 }
 
-// export function useRemoveJob() {
-//   return {
-//     async removeJob(job: Job | undefined) {
-//       let jobpk = job?.id
-//       try {
-//         const response = await api('canceljob', { jobpk })
-//         if (response) {
-//           return response
-//         } else {
-//           console.error('Response is undefined or null')
-//           toast.error('Failed to remove job. Unexpected response')
-//         }
-//       } catch (error) {
-//         console.error(error)
-//         toast.error('An error occurred while removing the job')
-//       }
-//     }
-//   }
-// }
-
+/*
+  Cancels the job in the queue.
+*/
 export function useRemoveJob() {
   return {
     async removeJob(jobarr: number[]) {
-      // let jobpk = job?.id
       try {
         const response = await api('cancelfromqueue', { jobarr })
         if (response) {
@@ -372,6 +389,9 @@ export function useRemoveJob() {
   }
 }
 
+/*
+  Not sure if we use this anymore, used to change position of jobs in queue 
+*/
 export function bumpJobs() {
   return {
     async bumpjob(job: Job, printer: Device, choice: number) {
@@ -400,6 +420,10 @@ export function bumpJobs() {
   }
 }
 
+/*
+  The "key" parameter indicates if the user clicked clear, clear & rerun, or fail. This removes the job from the queue 
+  after its done printing. 
+*/
 export function useReleaseJob() {
   return {
     async releaseJob(job: Job | undefined, key: number, printerid: number | undefined) {
@@ -426,6 +450,10 @@ export function useReleaseJob() {
     }
   }
 }
+
+/*
+
+*/
 export function useGetGcode() {
   return {
     async getgcode(job: Job) {
@@ -440,6 +468,9 @@ export function useGetGcode() {
   }
 }
 
+/*
+
+*/
 export function useGetJobFile() {
   return {
     async getFileDownload(jobid: number) {
@@ -473,6 +504,9 @@ export function useGetFile() {
   }
 }
 
+/*
+  Removes files from database >6 months old 
+*/
 export function useClearSpace() {
   return {
     async clearSpace() {
@@ -499,6 +533,9 @@ export function useClearSpace() {
   }
 }
 
+/*
+  Makes job's "favorites" flag 1 
+*/
 export function useFavoriteJob() {
   return {
     async favorite(job: Job, favorite: boolean) {
@@ -517,6 +554,9 @@ export function useFavoriteJob() {
   }
 }
 
+/*
+  Moves position of jobs in queue 
+*/
 export function useMoveJob() {
   return {
     async moveJob(printerid: number | undefined, arr: number[] | undefined) {
@@ -536,6 +576,9 @@ export function useMoveJob() {
   }
 }
 
+/*
+  Deletes job from database
+*/
 export function useDeleteJob() {
   return {
     async deleteJob(job: Job) {
@@ -551,6 +594,9 @@ export function useDeleteJob() {
   }
 }
 
+/*
+  When the user clicks "start print," this function is called. Allows the printer to begin recieving gcode commands. 
+*/
 export function useStartJob() {
   return {
     async start(jobid: number, printerid: number) {
@@ -565,6 +611,9 @@ export function useStartJob() {
   }
 }
 
+/*
+  Assigns a comment to a job 
+*/
 export function useAssignComment() {
   return {
     async assignComment(job: Job, comment: string) {
@@ -593,6 +642,9 @@ export function useAssignComment() {
   }
 }
 
+/*
+  Removes issues from job 
+*/
 export function useRemoveIssue() {
   return {
     async removeIssue(job: Job) {
@@ -621,6 +673,10 @@ export function useRemoveIssue() {
   }
 }
 
+/*
+  Downloads CSV file of all jobs in the jobIds array (filled when user applies filter to job history). If not specified, 
+  all jobs in database are downloaded. 
+*/
 export function useDownloadCsv() {
   return {
     async csv(allJobs: number, jobIds?: number[]): Promise<void> {
@@ -633,15 +689,12 @@ export function useDownloadCsv() {
 
         const blob = await response.blob() // Convert the response to a blob
         const date = new Date()
-        // Format the date as YYYY-MM-DD
         const dateString = ('0' + (date.getMonth() + 1)).slice(-2) + ('0' + date.getDate()).slice(-2) + date.getFullYear();
-        
-        // Generate the filename
         const filename = `jobs_${dateString}.csv`
 
-        saveAs(blob, filename)
+        saveAs(blob, filename) // saves file 
 
-        await deleteCSVFromServer()
+        await deleteCSVFromServer() // Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder 
       } catch (error) {
         console.error('An error occurred while downloading the CSV:', error)
         toast.error('An error occurred while downloading the CSV')
@@ -650,6 +703,8 @@ export function useDownloadCsv() {
   }
 }
 
+// Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder. 
+// Called by useDownloadCSV. 
 export async function deleteCSVFromServer() {
   try {
     const response = await api(`removeCSV`)
