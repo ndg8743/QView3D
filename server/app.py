@@ -34,7 +34,7 @@ app.socketio = socketio
 """
 from controllers.ports import ports_bp
 from controllers.jobs import jobs_bp
-from controllers.statusService import status_bp, getStatus 
+from controllers.statusService import status_bp 
 from controllers.issues import issue_bp
 
 """
