@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, watchEffect } from 'vue';
+import { ref, watchEffect } from 'vue';
 import { ColorPicker } from "vue3-colorpicker";
 import "vue3-colorpicker/style.css";
 
+// Color variables
 const primary = ref<string>("rgb(117, 97, 169)");
 const primaryFont = ref<string>("white");
 const success = ref<string>("rgb(96, 174, 174)");
@@ -19,6 +20,8 @@ const uploadedFontFace = ref<FontFace | null>(null);
 const uploadedFontFaceTemp = ref<FontFace | null>(null);
 const fontFileName = ref(null);
 
+// reset colors to the original values
+// the main purple and teal colors
 const revertColors = () => {
     primaryTemp.value = "rgb(117, 97, 169)";
     successTemp.value = "rgb(96, 174, 174)";
@@ -28,6 +31,9 @@ const revertColors = () => {
     saveColors();
 };
 
+// save the colors to the main variables
+// basically just sets the main variables to the temp variables
+// which is then applied to the css
 const saveColors = () => {
     primary.value = primaryTemp.value;
     primaryFont.value = fontColor(primary.value);
@@ -55,6 +61,8 @@ const saveColors = () => {
     document.documentElement.style.setProperty('--bs-success-color-disabled', lightenedColorSuccess);
 };
 
+// watch for changes in the temp variables
+// used for displaying the temp buttons
 watchEffect(() => {
     if (primaryTemp.value !== primary.value || successTemp.value !== success.value) {
         primaryFontTemp.value = fontColor(primaryTemp.value);
@@ -81,8 +89,8 @@ watchEffect(() => {
     }
 });
 
+// returns a shade of the color based on the magnitude
 const newShade = (rgb: string, magnitude: number): string => {
-    // Extract the individual red, green, and blue color values
     let rgbValues = rgb.match(/\d+/g);
 
     if (!rgbValues) {
@@ -91,15 +99,14 @@ const newShade = (rgb: string, magnitude: number): string => {
 
     let [r, g, b] = rgbValues.map(Number);
 
-    // Adjust color brightness
     r = Math.round(Math.min(Math.max(0, r + (r * magnitude / 100)), 255));
     g = Math.round(Math.min(Math.max(0, g + (g * magnitude / 100)), 255));
     b = Math.round(Math.min(Math.max(0, b + (b * magnitude / 100)), 255));
 
-    // Return the new color in RGB format
     return `rgb(${r}, ${g}, ${b})`;
 };
 
+// returns the brightness of the color
 const brightness = (rgb: string) => {
     let rgbValues = rgb.match(/\d+/g);
 
@@ -112,10 +119,14 @@ const brightness = (rgb: string) => {
     return Math.round(((r * 299) + (g * 587) + (b * 114)) / 1000);
 }
 
+// returns the font color based on the brightness of the color
 const fontColor = (rgb: string) => {
     return brightness(rgb) > 155 ? 'black' : 'white';
 }
 
+// handles the upload of the font file
+// reads the file and creates a font face
+// then applies the font face to the temp variable
 const handleFontUpload = (event: any) => {
     let file = event.target.files[0];
     fontFileName.value = file.name;
@@ -126,7 +137,6 @@ const handleFontUpload = (event: any) => {
             let fontFace = new FontFace('userFontTemp', reader.result as ArrayBuffer);
             fontFace.load().then((loadedFace) => {
                 uploadedFontFaceTemp.value = loadedFace;
-                // Set the CSS variable here for the preview
                 document.documentElement.style.setProperty('--user-font-temp', 'userFontTemp');
             });
         }
@@ -135,6 +145,7 @@ const handleFontUpload = (event: any) => {
     reader.readAsArrayBuffer(file);
 };
 
+// saves the font face to the main variable
 const saveFont = () => {
     if (uploadedFontFaceTemp.value) {
         uploadedFontFace.value = uploadedFontFaceTemp.value;
@@ -147,21 +158,31 @@ const saveFont = () => {
     }
 };
 
+// triggers the file input
+// allows the user to select a file
 const triggerFileInput = () => {
     const fileInput = document.getElementById('fontFile') as HTMLInputElement;
     fileInput.click();
 }
 
+// resets the font to the original font
 const revertFont = () => {
     document.documentElement.style.removeProperty('--user-font');
     uploadedFontFaceTemp.value = null;
     uploadedFontFace.value = null;
     fontFileName.value = null;
 };
-
 </script>
 
 <template>
+    <!-- 
+        This is the theme panel
+        It is an offcanvas that allows the user to change the theme of the software
+        The user can change the primary and success colors
+        The user can also upload a font file
+        The font file will be used as the font for the software
+        The user can revert the changes or save the changes
+     -->
     <div class="offcanvas offcanvas-end" tabindex="-1" id="themeOffcanvas" aria-labelledby="themeOffcanvasLabel"
         style="background-color: #b9b9b9;">
         <div class="offcanvas-header" style="background-color: #484848; color: #dbdbdb;">
@@ -229,6 +250,9 @@ const revertFont = () => {
 </template>
 
 <style scoped>
+/*
+style for the component
+*/
 .form-control,
 .list-group-item {
     background-color: #f4f4f4 !important;
@@ -275,6 +299,15 @@ const revertFont = () => {
 </style>
 
 <style>
+/*
+this is a global style
+it changes the primary and success colors to the ones selected by the user
+same with the font
+
+it is hefty
+wherever there is a color or font that is used in the software
+it is changed here
+*/
 .btn-primary {
     --bs-btn-color: var(--bs-primary-font-color, #fff);
     --bs-btn-bg: var(--bs-primary-color, #7561a9);

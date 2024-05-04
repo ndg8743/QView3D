@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
+// route to check if the current route is the submit page
 const route = useRoute();
 
+// check if the current route is the submit page
+// need this for rerun job, because rerun jobs sends the user
+// to the submit page with other parameters
+// meaning the route is not '/submit'
 const isSubmitRoute = computed(() => route.path.startsWith('/submit'));
 </script>
 
 <template>
+  <!-- 
+    The navbar is a sticky navbar that is always at the top of the page
+    It has a logo on the left and links to the different pages on the right
+    The current page is displayed with the text being brighter
+   -->
   <div style="position: sticky; top: 0;">
     <nav class="navbar navbar-expand-lg thick">
       <router-link to="/" class="navbar-brand">
@@ -43,9 +53,6 @@ const isSubmitRoute = computed(() => route.path.startsWith('/submit'));
         </ul>
       </div>
     </nav>
-    <!-- <div class="current-page">
-      {{ currentPage }}
-    </div> -->
   </div>
 </template>
 
@@ -60,16 +67,13 @@ const isSubmitRoute = computed(() => route.path.startsWith('/submit'));
 }
 
 .navbar {
-  /* background: #525060 !important; */
   background: #484848 !important;
 }
 
 .nav-link {
   font-size: 1.2em;
-  /* Adjust the value as needed */
   font-weight: bold;
   padding-right: 1.5rem !important;
-  /* Adjust the value as needed */
   color: #a8a8a8;
 }
 

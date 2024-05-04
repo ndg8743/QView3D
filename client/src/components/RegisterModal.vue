@@ -1,22 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue';
-import { printers, useRegisterPrinter, useGetPorts, useRetrievePrinters, useRetrievePrintersInfo, useRepair, useMoveHead, type Device } from '../model/ports';
-import { toast } from '@/model/toast';
+import { ref, onMounted } from 'vue';
+import { printers, useRegisterPrinter, useGetPorts, useRetrievePrintersInfo, useMoveHead, type Device } from '../model/ports';
 
+// methods to be used in the component
 const { ports } = useGetPorts();
-const { retrieve } = useRetrievePrinters();
 const { retrieveInfo } = useRetrievePrintersInfo();
 const { register } = useRegisterPrinter();
 const { move } = useMoveHead();
 
-let customname = ref('') // Stores the user input name of printer
+// variables to be used in the component
+let customname = ref('')
 let selectedDevice = ref<Device | null>(null)
-let devices = ref<Array<Device>>([]) // Stores the list of devices
+let devices = ref<Array<Device>>([])
 
+// emit events
+// need this for the parent component to listen to the events
 const emit = defineEmits(['close', 'submit-form'])
 
+// when the component is mounted
+// get all the devices and set the devices variable
+// add event listeners for the modal
+// when opened, get the ports
+// this is like a refresh ports call
+// when the user has the software running and plugs in a printer
+// when this component is opened, it will get the new printer
+// then when the modal is closed, emit the close event
 onMounted(async () => {
-    const allDevices = await ports();  // load all ports
+    const allDevices = await ports();
     devices.value = allDevices
 
     const modalElement = document.getElementById('registerModal')
@@ -31,11 +41,15 @@ onMounted(async () => {
     }
 })
 
+// method to get the ports and set the devices variable
 const doGetPorts = async () => {
     const allDevices = await ports();
     devices.value = allDevices;
 }
 
+// method to register the printer
+// then refresh the devices and printers
+// then clear the selected device
 const doRegister = async () => {
     if (selectedDevice.value && customname.value) {
         selectedDevice.value = {
@@ -61,6 +75,7 @@ const doRegister = async () => {
     clearSelectedDevice()
 }
 
+// clears the selected device after a delay
 const clearSelectedDevice = () => {
     setTimeout(() => {
         selectedDevice.value = null;
@@ -68,13 +83,23 @@ const clearSelectedDevice = () => {
     }, 500)
 }
 
+// auto homes the printer
+// needed if plenty of printers connected
+// so while registering, you auto home the selected printer
+// so you know which printer you are registering
 const doMove = async (printer: Device) => {
     await move(printer.device)
 }
-
 </script>
 
 <template>
+    <!-- 
+        The modal to register the printers
+        The user can select a printer from the dropdown
+        Then give it a custom name
+        Then register the printer
+        The user can also home the printer
+     -->
     <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true"
         data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered">

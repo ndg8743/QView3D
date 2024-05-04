@@ -1,23 +1,37 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onActivated, onDeactivated, ref, toRef, watchEffect, onUnmounted } from 'vue';
+import { onMounted, ref, toRef, watchEffect, onUnmounted } from 'vue';
 import { useGetFile, type Job } from '@/model/jobs';
 import * as GCodePreview from 'gcode-preview';
 
+// method to be used in the component
 const { getFile } = useGetFile();
 
+// prop, just a job
 const props = defineProps({
     job: Object as () => Job
 })
 
+// assing the job passed to a ref
 const job = toRef(props, 'job');
 
+// ref for the modal from the page it was opened from
 const modal = document.getElementById('gcodeLiveViewModal');
 
-// Create a ref for the canvas
+// create a ref for the canvas, a variable for the preview and an array for the layers
 const canvas = ref<HTMLCanvasElement | null>(null);
 let preview: GCodePreview.WebGLPreview | null = null;
 let layers: string[][] = [];
 
+// when the component is mounted
+// if there is no modal, log an error
+// get the file from the job
+// convert the file to a string
+// split the string into lines
+// create an array of layers
+// watch to see if the next layer should be drawn
+// when the modal is shown, initialize the preview and draw the gcode
+// when the modal is hidden, clean up the preview
+// this is for failsafe
 onMounted(async () => {
     if (!modal) {
         console.error('Modal element is not available');
@@ -94,12 +108,14 @@ onMounted(async () => {
     });
 });
 
+// for fail safe again, just when the component is unmounted
 onUnmounted(() => {
     preview?.processGCode('');
     preview?.clear();
     preview = null;
 });
 
+// convert the file to one long string
 const fileToString = (file: File | undefined) => {
     if (!file) {
         console.error('File is not available');
@@ -120,6 +136,9 @@ const fileToString = (file: File | undefined) => {
 </script>
 
 <template>
+    <!-- 
+        the canvas where the gcode will be drawn
+     -->
     <canvas ref="canvas"></canvas>
 </template>
 

@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onActivated, onDeactivated, ref, toRef, onUnmounted } from 'vue';
+import { onMounted, ref, toRef, onUnmounted } from 'vue';
 import { useGetFile, type Job } from '@/model/jobs';
 import * as GCodePreview from 'gcode-preview';
 
+// method to be used in the component
 const { getFile } = useGetFile();
 
+// props
+// could be job or file, not both
 const props = defineProps({
     job: Object as () => Job,
     file: Object as () => File
 })
 
+// if file is provided, use the file
+// if job is provided, get the file from the job
 const file = () => {
     if (props.file) {
         return props.file
@@ -20,12 +25,22 @@ const file = () => {
     }
 }
 
+// ref for the modal from the page it was opened from
 const modal = document.getElementById('gcodeImageModal');
 
-// Create a ref for the canvas
+// create a ref for the canvas and a variable for the preview
 const canvas = ref<HTMLCanvasElement | null>(null);
 let preview: GCodePreview.WebGLPreview | null = null;
 
+// when the component is mounted
+// if there is no modal, log an error
+// if there is a canvas, initialize the preview
+// set the preview camera to above the print bed
+// look at the center of the bed
+// get the file and convert it to a string
+// draw the gcode on the preview
+// when the modal is closed, clean up the preview
+// this is for failsafe
 onMounted(async () => {
     if (!modal) {
         console.error('Modal element is not available');
@@ -66,12 +81,14 @@ onMounted(async () => {
     });
 });
 
+// for fail safe again, just when the component is unmounted
 onUnmounted(() => {
     preview?.processGCode('');
     preview?.clear();
     preview = null;
 });
 
+// convert the file to one long string
 const fileToString = (file: File | undefined) => {
     if (!file) {
         console.error('File is not available');
@@ -92,6 +109,9 @@ const fileToString = (file: File | undefined) => {
 </script>
 
 <template>
+    <!-- 
+        the canvas where the gcode will be drawn
+     -->
     <canvas ref="canvas"></canvas>
 </template>
 
