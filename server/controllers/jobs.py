@@ -77,19 +77,15 @@ def add_job_to_queue():
             favorite = 0
         status = 'inqueue'
         
-        # Insert job into DB and return the PK. Retrieve the in-memory job object after making DB insertion. 
         res = Job.jobHistoryInsert(name, printer_id, status, file, file_name_original, favorite, td_id) 
         id = res['id']
         job = Job.query.get(id)
         
-        # Get the base name and extension of the file. Then, append the primary key to the name and set it to the 
-        # file_name_pk attribute. This is what we will name the file in the uploads folder while the job is printinh. 
         base_name, extension = os.path.splitext(file_name_original)
         file_name_pk = f"{base_name}_{id}{extension}"
         job.setFileName(file_name_pk) 
-        job.setFilament(filament) # set filament type
+        job.setFilament(filament) 
 
-        # Add to front/back of queue depending on priority 
         if priority == 'true':
             findPrinterObject(printer_id).getQueue().addToFront(job, printer_id)
         else:
