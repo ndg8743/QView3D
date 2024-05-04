@@ -9,6 +9,7 @@ import { useAssignIssue, useGetIssues, type Issue } from '@/model/issues';
 import { jobTime, useAssignComment, useGetFile, useGetJobFile, useReleaseJob, useStartJob, type Job } from '@/model/jobs';
 import { useRouter } from 'vue-router';
 
+// methods from the models to be used in the view
 const { assign } = useAssignIssue()
 const { assignComment } = useAssignComment()
 const { releaseJob } = useReleaseJob()
@@ -19,8 +20,10 @@ const { start } = useStartJob()
 const { getFileDownload } = useGetJobFile()
 const { movePrinterList } = useMovePrinterList()
 
+// router to navigate to other pages
 const router = useRouter()
 
+// variables to be used in the view
 const selectedIssue = ref<Issue>()
 const selectedJob = ref<Job>()
 let jobComments = ref('')
@@ -37,6 +40,8 @@ let isGcodeLiveViewVisible = ref(false)
 
 let expandedState: (string | undefined)[] = [];
 
+// retreive the issues and set the issuelist
+// gets the modal elements and sets the visibility of the modals
 onMounted(async () => {
   const retrieveissues = await issues()
   issuelist.value = retrieveissues
@@ -55,6 +60,8 @@ onMounted(async () => {
   });
 });
 
+// formats the time to be displayed in the view
+// intake is in milliseconds, then it is converted to hours, minutes, and seconds
 function formatTime(milliseconds: number): string {
   const seconds = Math.floor((milliseconds / 1000) % 60)
   const minutes = Math.floor((milliseconds / (1000 * 60)) % 60)
@@ -68,6 +75,8 @@ function formatTime(milliseconds: number): string {
   return hoursStr + ':' + minutesStr + ':' + secondsStr
 }
 
+// formats the ETA to be displayed in the view
+// intake is in milliseconds, then it is converted to US time format
 function formatETA(milliseconds: number): string {
   const date = new Date(milliseconds)
   const timeString = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
@@ -79,11 +88,15 @@ function formatETA(milliseconds: number): string {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
+// collapse all the expanded printer info
+// used when dragging the printers
 const collapseAll = () => {
   expandedState = printers.value.filter(printer => printer.isInfoExpanded).map(printer => printer.id?.toString());
   printers.value.forEach(printer => printer.isInfoExpanded = false);
 }
 
+// restore the expanded printer info
+// if a printer was expanded before dragging, it will be expanded after dragging
 const restoreExpandedState = () => {
   printers.value.forEach(printer => {
     if (expandedState.includes(printer.id?.toString())) {
@@ -92,6 +105,9 @@ const restoreExpandedState = () => {
   });
 }
 
+// if a job is failed, issueModal will appear
+// user can select an issue and add comments
+// then the issue will be assigned to the job
 const doAssignIssue = async () => {
   if (selectedJob.value === undefined) return
   await assignComment(selectedJob.value, jobComments.value)
@@ -108,6 +124,7 @@ const doAssignIssue = async () => {
   await nextTick()
 }
 
+// open the modal for the gcode live view or gcode image
 const openModal = async (job: Job, printerName: string, num: number, printer: Device) => {
   await jobTime(job, printers)
   currentJob.value = job
@@ -126,11 +143,15 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
   }
 }
 
+// set the job and comment to the selected job
 const setJob = async (job: Job) => {
   jobComments.value = job.comment || '';
   selectedJob.value = job;
 }
 
+// if user clicks printer name
+// it will send the user to the queue view
+// with the printers queue expanded
 const sendToQueueView = (printer: Device | undefined) => {
   if (printer) {
     printer.isQueueExpanded = true;
@@ -138,6 +159,7 @@ const sendToQueueView = (printer: Device | undefined) => {
   }
 }
 
+// set the printer status
 const setPrinterStatus = async (printer: Device, status: string) => {
   await setStatus(printer.id, status); // update the status in the backend
   setTimeout(() => {
@@ -149,21 +171,23 @@ const setPrinterStatus = async (printer: Device, status: string) => {
   });
 }
 
+// starts the print
 const startPrint = async (printerid: number, jobid: number) => {
   await start(jobid, printerid)
 }
 
+// open the printer info, gets the job time
 const openPrinterInfo = async (printer: Device) => {
   if (printer.queue && printer.queue[0]) {
     await jobTime(printer.queue[0], printers)
   }
 
   printer.isInfoExpanded = !printer.isInfoExpanded;
-
 }
 
+// release the job
+// if the job is complete, user can clear the job, clear and rerun the job, or fail the job
 const releasePrinter = async (jobToFind: Job | undefined, key: number, printerIdToPrintTo: number) => {
-
   let printer = printers.value.find((printer) => printer.id === printerIdToPrintTo)
   printer!.error = ""
 
@@ -176,14 +200,22 @@ const releasePrinter = async (jobToFind: Job | undefined, key: number, printerId
   await nextTick()
 }
 
+// move the printer list when done dragging
 const handleDragEnd = async () => {
   await movePrinterList(printers.value)
 }
-
 </script>
 
 <template>
+  <!-- 
+    modal for assigning an issue to a job
+    the user can select an issue from the dropdown
+    and add comments to the job
 
+    the user can also unassign an issue by selecting the "Unassign Issue" option
+
+    if the user assigns an issue to a job, the job status will be set to Error
+  -->
   <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="assignIssueLabel" aria-hidden="true"
     data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -224,7 +256,10 @@ const handleDragEnd = async () => {
     </div>
   </div>
 
-  <!-- bootstrap 'gcodeLiveViewModal' -->
+  <!-- 
+    modal for displaying the gcode live view
+    the live view updates based on the current layer height
+  -->
   <div class="modal fade" id="gcodeLiveViewModal" tabindex="-1" aria-labelledby="gcodeLiveViewModalLaebl"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
@@ -245,7 +280,14 @@ const handleDragEnd = async () => {
     </div>
   </div>
 
-  <!-- bootstrap 'gcodeImageModal' -->
+  <!-- 
+    this modal is used to show the gcode image
+    it has two views, the image view and the viewer view
+    if the file has an image, it will show the image view
+    but no matter what, it will show the viewer view
+
+    both components gets the job as a prop
+  -->
   <div class="modal fade" id="gcodeImageModal" tabindex="-1" aria-labelledby="gcodeImageModalLabel" aria-hidden="true">
     <div :class="['modal-dialog', isImageVisible ? '' : 'modal-xl', 'modal-dialog-centered']">
       <div class="modal-content">
@@ -270,6 +312,53 @@ const handleDragEnd = async () => {
     </div>
   </div>
 
+  <!-- 
+    the main view of the page
+    the main table displays:
+    - ticked id of job
+    - printer name
+    - printer status
+    - job name
+    - file name
+    - printer options
+      - set to ready
+      - turn offline
+      - start
+      - pause
+      - colorchange
+      - unpause
+      - stop
+    - progress
+    - actions
+      - printer info toggle
+      - settings dropdown
+        - image viewer
+        - live viewer
+        - download file
+    - move
+
+    each row has a printer info row
+    which is opened when the printer info toggle is clicked
+    the printer info row displays:
+    - current layer / max layer
+    - filament type
+    - extruder temp
+    - bed temp
+    - elapsed time
+    - remaining time
+    - total time
+    - eta
+
+    it is a MASSIVE if statement,
+    if printer info is expanded, it will display the printer info row
+    else
+    it will display the normal row
+    meaning the normal row is coded twice
+    it is not the best code, but it works
+    (could be its own component)
+
+    if no printers are available, a message will be displayed
+   -->
   <div class="container">
     <table ref="table">
       <tr>

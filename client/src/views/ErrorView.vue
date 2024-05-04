@@ -2,13 +2,14 @@
 import { printers, type Device } from '../model/ports'
 import { type Issue, useGetIssues, useCreateIssues, useAssignIssue, useDeleteIssue, useEditIssue } from '../model/issues'
 import { pageSize, useGetJobs, type Job, useAssignComment, useGetJobFile, useGetFile, useRemoveIssue, useDownloadCsv, isLoading } from '../model/jobs';
-import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
+import { computed, onUnmounted, onMounted, ref, watchEffect } from 'vue';
 import { useRouter } from 'vue-router';
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue'
 import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 
+// methods from the models to be used in the view
 const { jobhistory } = useGetJobs()
 const { issues } = useGetIssues()
 const { createIssue } = useCreateIssues()
@@ -20,6 +21,11 @@ const { deleteIssue } = useDeleteIssue()
 const { removeIssue } = useRemoveIssue()
 const { editIssue } = useEditIssue()
 const { csv } = useDownloadCsv()
+
+// router to navigate to other pages
+const router = useRouter();
+
+// variables to be used in the view
 let everyJob = ref<Array<Job>>([])
 const showText = ref(false)
 const newIssue = ref('')
@@ -29,11 +35,10 @@ const selectedJob = ref<Job>()
 const selectedIssues = ref<Array<number>>([])
 const newName = ref('')
 const searchTicketId = ref('')
-let filterApplied = ref(0)
 
 const selectedPrinters = ref<Array<Number>>([])
 const selectedJobs = ref<Array<Job>>([]);
-const searchJob = ref(''); // This will hold the current search query
+const searchJob = ref('');
 const searchByJobName = ref(true);
 const searchByFileName = ref(true);
 
@@ -41,12 +46,9 @@ const date = ref(null as Date | null);
 let startDateString = ref<string>('');
 let endDateString = ref<string>('');
 
-const router = useRouter();
-
 let displayJobs = ref<Array<Job>>([])
 let fetchedJobs = ref<Array<Job>>([])
 
-let jobs = ref<Array<Job>>([])
 let issuelist = ref<Array<Issue>>([])
 
 let currentJob = ref<Job>()
@@ -83,6 +85,12 @@ let filteredJobs = computed(() => {
     }
 })
 
+// sets issueList to the list of issues from the database
+// loads the jobs and total jobs into fetchedJobs and totalJobs
+// also gets favorite jobs
+// adds an event listener to close the dropdown when clicked outside
+// gets the modal element and adds an event listener to hide the gcode image modal
+// gets the modal element and adds an event listener to hide the issue modal
 onMounted(async () => {
     try {
         isLoading.value = true;
@@ -123,10 +131,12 @@ onMounted(async () => {
     }
 });
 
-onBeforeUnmount(() => {
+// removes the event listener
+onUnmounted(() => {
     document.removeEventListener('click', closeDropdown);
 });
 
+// watches for changes in the selectedPrinters and selectedIssues
 watchEffect(() => {
     if (selectedJob.value) {
         const issueName = selectedJob.value.error;
@@ -135,6 +145,24 @@ watchEffect(() => {
     }
 });
 
+// pushes the user to the submit job page with the job and printer as parameters
+const handleRerun = async (job: Job, printer: Device) => {
+    await router.push({
+        name: 'SubmitJobVue',
+        params: { job: JSON.stringify(job), printer: JSON.stringify(printer) }
+    });
+}
+
+// pushes the user to the submit job page with the job as a parameter
+const handleEmptyRerun = async (job: Job) => {
+    await router.push({
+        name: 'SubmitJobVue',
+        params: { job: JSON.stringify(job) }
+    })
+}
+
+// pagination function to change the page
+// refetches the jobs and total jobs
 const changePage = async (newPage: any) => {
     isLoading.value = true
     if (newPage < 1 || newPage > Math.ceil(totalJobs.value / pageSize.value)) {
@@ -147,15 +175,16 @@ const changePage = async (newPage: any) => {
 
     // Fetch jobs into `fetchedJobs` and total into `totalJobs`
     [fetchedJobs.value, totalJobs.value] = await jobhistory(page.value, pageSize.value, printerIds, 1, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value)
-
     // Update `displayJobs` with the fetched jobs
     displayJobs.value = fetchedJobs.value;
 
     isLoading.value = false
 }
 
+// submits the filter based on the selected options
+// then fetches the jobs and total jobs based on the filter
+// sets the total pages based on the total jobs
 async function submitFilter() {
-    filterApplied.value = 1;
     isLoading.value = true
     filterDropdown.value = false;
 
@@ -182,7 +211,6 @@ async function submitFilter() {
         searchCriteria.value = searchJob.value;
     }
 
-    // Get the total number of jobs first, without considering the page number
     [fetchedJobs.value, totalJobs.value] = await jobhistory(1, Number.MAX_SAFE_INTEGER, printerIds, 1, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
 
     totalPages.value = Math.ceil(totalJobs.value / pageSize.value);
@@ -202,10 +230,9 @@ async function submitFilter() {
     isLoading.value = false;
 }
 
-
+// clears the filter and resets the page to 1
 function clearFilter() {
     page.value = 1;
-    // pageSize.value = 10;
 
     selectedPrinters.value = [];
     selectedIssues.value = [];
@@ -213,6 +240,7 @@ function clearFilter() {
     if (order.value === 'oldest') {
         order.value = 'newest';
     }
+
     favoriteOnly.value = false;
 
     searchJob.value = '';
@@ -228,12 +256,16 @@ function clearFilter() {
     submitFilter();
 }
 
+// function to ensure that at least one checkbox is checked
+// when deciding whether to search by job name or file name
 const ensureOneCheckboxChecked = () => {
     if (!searchByJobName.value && !searchByFileName.value) {
         searchByJobName.value = true;
     }
 }
 
+// creates a new issue
+// fetches the new list of issues
 const doCreateIssue = async () => {
     isLoading.value = true
     await createIssue(newIssue.value)
@@ -243,6 +275,9 @@ const doCreateIssue = async () => {
     isLoading.value = false
 }
 
+// deletes an issue
+// fetches the new list of issues
+// resubmits the filter to display the jobs issues correctly
 const doDeleteIssue = async (issue: Issue) => {
     isLoading.value = true
     if (issue === undefined) return
@@ -254,6 +289,11 @@ const doDeleteIssue = async (issue: Issue) => {
     isLoading.value = false
 }
 
+// assigns an issue to a job
+// if the issue is undefined, it removes the issue from the job
+// if the issue is defined, it assigns the issue to the job
+// then assigns the comment to the job
+// resubmits the filter to display the jobs issues correctly
 const doAssignIssue = async () => {
     if (selectedJob.value === undefined) return
     const selectedIssueObject = issuelist.value.find((issue: any) => issue.id === selectedIssueId.value);
@@ -266,36 +306,26 @@ const doAssignIssue = async () => {
         selectedJob.value.errorid = selectedIssueObject.id
         selectedJob.value.error = selectedIssueObject.issue
     }
-    selectedJob.value.comment = jobComments.value
     await assignComment(selectedJob.value, jobComments.value)
+    selectedJob.value.comment = jobComments.value
     selectedIssueId.value = undefined
     selectedJob.value = undefined
 }
 
+// sets the job and comment to the selected job
 const setJob = async (job: Job) => {
     jobComments.value = job.comment || '';
     selectedJob.value = job;
 }
 
+// closes the dropdown if the user clicks outside of the dropdown
 const closeDropdown = (evt: any) => {
     if (filterDropdown.value && evt.target.closest('.dropdown-card') === null) {
         filterDropdown.value = false;
     }
 }
 
-const handleRerun = async (job: Job, printer: Device) => {
-    await router.push({
-        name: 'SubmitJobVue', // the name of the route to SubmitJob.vue
-        params: { job: JSON.stringify(job), printer: JSON.stringify(printer) } // the job and printer to fill in the form
-    });
-}
-
-const handleEmptyRerun = async () => {
-    await router.push({
-        name: 'SubmitJobVue'
-    })
-}
-
+// opens the gcode image modal
 const openGCodeModal = async (job: Job, printerName: string) => {
     currentJob.value = job
     currentJob.value.printer = printerName
@@ -308,6 +338,8 @@ const openGCodeModal = async (job: Job, printerName: string) => {
     }
 }
 
+// edits the issue
+// fetches the new list of issues
 const saveIssue = async (issue: Issue) => {
     await editIssue(issue.id, newName.value.trim())
     issue.issue = newName.value.trim();
@@ -316,6 +348,8 @@ const saveIssue = async (issue: Issue) => {
     resetIssueValues()
 }
 
+// resets the issue values
+// for the issue modal
 const resetIssueValues = () => {
     showText.value = false
     newIssue.value = ''
@@ -334,6 +368,7 @@ const doDownloadCsv = async () => {
     await csv(0, jobIds)
 }
 
+// makes the number input only accept numbers
 const onlyNumber = ($event: KeyboardEvent) => {
     let keyCode = $event.keyCode;
     if ((keyCode < 48 || keyCode > 57) && (keyCode < 96 || keyCode > 105) && keyCode !== 8) { // 48-57 are the keycodes for 0-9, 96-105 are for the numpad 0-9, 8 is for backspace
@@ -344,7 +379,14 @@ const onlyNumber = ($event: KeyboardEvent) => {
 </script>
 
 <template>
-    <!-- gcode image viewer modal -->
+    <!-- 
+        this modal is used to show the gcode image
+        it has two views, the image view and the viewer view
+        if the file has an image, it will show the image view
+        but no matter what, it will show the viewer view
+
+        both components gets the job as a prop
+     -->
     <div class="modal fade" id="gcodeImageModal" tabindex="-1" aria-labelledby="gcodeImageModalLabel"
         aria-hidden="true">
         <div :class="['modal-dialog', isImageVisible ? '' : 'modal-xl', 'modal-dialog-centered']">
@@ -370,6 +412,11 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
+    <!-- 
+        modal to download the csv file
+        will only have jobs based on the current filtration criteria
+        the user can download the csv file or close the modal
+     -->
     <div class="modal fade" id="csvModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -391,6 +438,10 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
+    <!-- 
+        modal to create, delete, and edit issues
+        all handled in the same modal
+     -->
     <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="issueModal" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -480,6 +531,15 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
+    <!-- 
+        modal for assigning an issue to a job
+        the user can select an issue from the dropdown
+        and add comments to the job
+
+        the user can also unassign an issue by selecting the "Unassign Issue" option
+
+        if the user assigns an issue to a job, the job status will be set to Error
+     -->
     <div class="modal fade" id="commentModal" tabindex="-1" aria-labelledby="commentModalLabel" aria-hidden="true"
         data-bs-backdrop="static">
         <div class="modal-dialog modal-dialog-centered">
@@ -523,6 +583,44 @@ const onlyNumber = ($event: KeyboardEvent) => {
         </div>
     </div>
 
+    <!-- 
+        the main content of the page
+        contains the filter dropdown, csv button, issue button, the table of jobs, and the pagination
+
+        filter dropdown contains the following:
+        - jobs per page
+        - devices
+        - issues
+        - search by ticket id
+        - search for jobs
+            - search by job name
+            - search by file name
+        - order by newest to oldest or oldest to newest
+        - date picker
+            - pick a singular date or a range
+        - favorites
+        
+        all jobs are initially displayed from newest to oldest, in a table
+        each job has a row, with the following columns:
+        - ticket id
+        - printer
+        - job name
+        - file name
+        - date errored
+        - issue
+        - comment
+        - actions
+            - image viewer
+            - comments modal
+            - download file
+            - rerun job
+                - empty rerun if user clicks 'Rerun'
+        
+        if there are no jobs, a message will be displayed
+
+        below the table, there is a pagination component
+        the user can change the page to view more jobs
+     -->
     <div class="container">
         <div class="row w-100" style="margin-bottom: 0.5rem;">
             <div class="col-1 text-start" style="padding-left: 0">
@@ -537,7 +635,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                                 Jobs per page, out of {{ totalJobs }}:
                             </label>
                             <input id="pageSize" type="number" v-model.number="pageSize" min="1" class="form-control"
-                            @keydown="onlyNumber($event)">
+                                @keydown="onlyNumber($event)">
                         </div>
                         <div class="my-2 border-top"
                             style="border-width: 1px; margin-left: -16px; margin-right: -16px;"></div>
@@ -681,8 +779,8 @@ const onlyNumber = ($event: KeyboardEvent) => {
                     <th style="width: 150px;">Printer</th>
                     <th style="width: 175px;">Job Title</th>
                     <th style="width: 175px;">File</th>
-                    <th style="width: 150px;">Issue</th>
                     <th style="width: 264px">Date errored</th>
+                    <th style="width: 150px;">Issue</th>
                     <th style="width: 200px;">Comment</th>
                     <th style="width: 75px;">Actions</th>
                 </tr>
@@ -693,12 +791,12 @@ const onlyNumber = ($event: KeyboardEvent) => {
                     <td class="truncate" :title="job.printer_name">{{ job.printer_name }}</td>
                     <td class="truncate" :title="job.name">{{ job.name }}</td>
                     <td class="truncate" :title="job.file_name_original">{{ job.file_name_original }}</td>
+                    <td class="truncate">{{ job.date }}</td>
                     <td class="truncate" :title="job.error" v-if="job.errorid != null && job.errorid != 0">
                         {{ job.error }}
                     </td>
                     <td v-else>
                     </td>
-                    <td class="truncate">{{ job.date }}</td>
                     <td class="truncate" :title="job.comment">{{ job.comment }}</td>
                     <td>
                         <div class="dropdown">
@@ -735,7 +833,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                                     </li>
                                     <li class="dropdown-submenu position-relative">
                                         <a class="dropdown-item d-flex justify-content-between align-items-center"
-                                            @click="handleEmptyRerun">
+                                            @click="handleEmptyRerun(job)">
                                             <div class="d-flex align-items-center">
                                                 <i class="fa-solid fa-chevron-left"></i>
                                                 <span class="ms-2">Rerun</span>
@@ -793,7 +891,6 @@ const onlyNumber = ($event: KeyboardEvent) => {
 .dropdown-card {
     position: absolute !important;
     top: calc(100% + 2px) !important;
-    /* Adjust this value to increase or decrease the gap */
     width: 400px;
     z-index: 1000;
     background: #d8d8d8;
@@ -809,9 +906,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
 .dropdown-submenu .dropdown-menu {
     top: -9px;
     right: 100%;
-    /* Position the submenu to the left */
     max-height: 200px;
-    /* Adjust this value as needed */
     overflow-y: auto;
 }
 
@@ -841,7 +936,6 @@ const onlyNumber = ($event: KeyboardEvent) => {
 
 .truncate-name {
     max-width: 200px;
-    /* Adjust this value as needed */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -849,7 +943,6 @@ const onlyNumber = ($event: KeyboardEvent) => {
 
 .truncate-file {
     max-width: 300px;
-    /* Adjust this value as needed */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

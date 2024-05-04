@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { printers, type Device } from '../model/ports'
 import { pageSize, useGetJobs, type Job, useGetJobFile, useDeleteJob, useClearSpace, useFavoriteJob, useGetFile, useAssignComment, useDownloadCsv, useRemoveIssue, isLoading } from '../model/jobs';
-import { computed, onMounted, onBeforeUnmount, ref, watchEffect, onUnmounted } from 'vue';
+import { computed, onMounted, ref, watchEffect, onUnmounted } from 'vue';
 import { type Issue, useGetIssues, useAssignIssue } from '../model/issues'
 import { useRouter } from 'vue-router';
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue'
@@ -184,7 +184,7 @@ const changePage = async (newPage: any) => {
 // then fetches the jobs and total jobs based on the filter
 // sets the total pages based on the total jobs
 async function submitFilter() {
-    isLoading.value = true;
+    isLoading.value = true
     filterDropdown.value = false;
     filterApplied.value = 1;
 
@@ -211,7 +211,7 @@ async function submitFilter() {
         searchCriteria.value = searchJob.value;
     }
 
-    [fetchedJobs.value, totalJobs.value] = await jobhistory(1, Number.MAX_SAFE_INTEGER, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value, 1);
+    [fetchedJobs.value, totalJobs.value] = await jobhistory(1, Number.MAX_SAFE_INTEGER, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
 
     totalPages.value = Math.ceil(totalJobs.value / pageSize.value);
     totalPages.value = Math.max(totalPages.value, 1);
@@ -220,11 +220,13 @@ async function submitFilter() {
         page.value = totalPages.value;
     }
 
-    const [joblist] = await jobhistory(page.value, pageSize.value, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
-    jobs.value = joblist;
+    // Now fetch the jobs for the current page
+    [fetchedJobs.value] = await jobhistory(page.value, pageSize.value, printerIds, 0, oldestFirst.value, searchJob.value, searchCriteria.value, searchTicketId.value, favoriteOnly.value, selectedIssues.value, startDateString.value, endDateString.value);
+
+    // Update `displayJobs` with the fetched jobs
+    displayJobs.value = fetchedJobs.value;
 
     selectedJobs.value = [];
-
     isLoading.value = false;
 }
 
@@ -233,18 +235,18 @@ function clearFilter() {
     page.value = 1;
 
     selectedPrinters.value = [];
+    selectedIssues.value = [];
 
     if (order.value === 'oldest') {
         order.value = 'newest';
     }
+
     favoriteOnly.value = false;
 
     searchJob.value = '';
     searchTicketId.value = '';
     searchByJobName.value = true;
     searchByFileName.value = true;
-
-    selectedIssues.value = [];
 
     date.value = null;
 
@@ -357,6 +359,11 @@ const setJob = (job: Job) => {
     selectedJob.value = job;
 }
 
+// assigns an issue to a job
+// if the issue is undefined, it removes the issue from the job
+// if the issue is defined, it assigns the issue to the job
+// then assigns the comment to the job
+// resubmits the filter to display the jobs issues correctly
 const doAssignIssue = async () => {
     if (selectedJob.value === undefined) return
     const selectedIssueObject = issuelist.value.find((issue: any) => issue.id === selectedIssueId.value);
@@ -440,7 +447,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                         selectedJob?.td_id
                     }}</h5>
                     <h6 class="modal-title" id="assignIssueLabel" style="padding-left:10px; line-height: 1;">{{
-                        selectedJob?.date }}</h6>
+                            selectedJob?.date }}</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
                         @click="selectedIssue = undefined; selectedJob = undefined;"></button>
                 </div>
