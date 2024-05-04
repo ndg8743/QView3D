@@ -367,14 +367,16 @@ class Printer(db.Model):
         try:
             self.ser.write(f"{message}\n".encode("utf-8"))
             while True:
-                if(self.terminated==1): 
+                if(self.terminated==1): # Exit target function if "hard reset" in registered view 
                     return 
                 
                 response = self.ser.readline().decode("utf-8").strip()
-                if response == "": 
+                
+                if response == "":
                     if self.prevMes == "M602":
                         self.responseCount = 0
                         # break
+                        
                     else: 
                         self.responseCount+=1 
                         if(self.responseCount>=10):
@@ -387,7 +389,7 @@ class Printer(db.Model):
                 else:
                     self.responseCount = 0
 
-                if ("T:" in response) and ("B:" in response):
+                if ("T:" in response) and ("B:" in response): # We sent a GCode command to get the temperature of the extruder and bed in the response. This code parses it to display frontend 
                     # Extract the temperature values using regex
                     temp_t = re.search(r'T:(\d+.\d+)', response)
                     temp_b = re.search(r'B:(\d+.\d+)', response)
@@ -402,14 +404,17 @@ class Printer(db.Model):
             self.setError(e)
             return "error"
 
+
+    """
+        Command that sends ending commands to printer. I think originally there was a reason we used a separate function to 
+        send the ending commands (instead of just using sendGcode) but I think they're the same now. Maybe we can get rid of this in the future.
+    """
     def gcodeEnding(self, message):
         try: 
             self.ser.write(f"{message}\n".encode("utf-8"))
-            # Save and print out the response from the printer. We can use this for error handling and status updates.
             while True:
                 if(self.terminated==1): 
                     return 
-                # logic here about time elapsed since last response
                 response = self.ser.readline().decode("utf-8").strip()
 
                 if response == "":
@@ -430,56 +435,50 @@ class Printer(db.Model):
             self.setError(e)
             return "error"
 
+    """
+        The point of this function is to open the file and send gcode commands (sendGcode function) one by one to the printer. 
+        This also handles logic for pausing, colorchange, timer, etc. 
+    """
     def parseGcode(self, path, job):
         try:
             with open(path, "r") as g:
-                # Read the file and store the lines in a list
                 if(self.terminated==1): 
                     return 
                 
-                lines = g.readlines()
+                lines = g.readlines() 
+                
+                comment_lines = [line for line in lines if line.strip() and line.startswith(";")] # Retrieves all lines in file that are not empty and start with ";"
 
-                #  Time handling
-                comment_lines = [line for line in lines if line.strip() and line.startswith(";")]
-
+                # Get the max layer height from the comments to display on frontebd 
                 for i in reversed(range(len(comment_lines))):
-                    # Check if the line contains ";LAYER_CHANGE"
                     if ";LAYER_CHANGE" in comment_lines[i]:
-                        # Check if the next line exists
                         if i < len(comment_lines) - 1:
-                            # Save the next line
                             line = comment_lines[i + 1]
-                            # Use regex to find the numerical value after ";Z:"
                             match = re.search(r";Z:(\d+\.?\d*)", line)
                             if match:
                                 max_layer_height = float(match.group(1))
                                 break
-
                 job.setMaxLayerHeight(max_layer_height)
                 
-
+                # Get the total time from the comments to display on frontend
                 total_time = job.getTimeFromFile(comment_lines)
                 job.setTime(total_time, 0)
-                # job.setTime(total_time, 0)
-
-                # Only send the lines that are not empty and don't start with ";"
-                # so we can correctly get the progress
+                
                 command_lines = [
                     line for line in lines if line.strip() and not line.startswith(";")
                 ]
-                # store the total to find the percentage later on
+                
+                # Store total # of lines. Progress bar is calculated based on (sent_lines / total_lines)*100. 
                 total_lines = len(command_lines)
-                # set the sent lines to 0
                 sent_lines = 0
-                # previous line to check for layer height
                 prev_line = ""
-                # Replace file with the path to the file. "r" means read mode. 
-                # now instead of reading from 'g', we are reading line by line
+
+                # Now begin looping through every non-commented line in the file and send them to the printer. 
                 for line in lines:
                     if(self.terminated==1): 
                         return 
                     
-                    if("layer" in line.lower() and self.status=='colorchange' and job.getFilePause()==0 and self.colorbuff==0):
+                    if("layer" in line.lower() and self.status=='colorchange' and job.getFilePause()==0 and self.colorbuff==0): # If the user clicked the "colorchange" button, status is now colorchange. If the printer isn't already paused (job.getFilePause()), and the color buffer is 0, meaning the color change sequence has not yet been initiated, and a new layer is detected in the line, set the "colorbuff" to 1. This is a "gate" that allows it to enter the colorchange sequence below. 
                         self.setColorChangeBuffer(1)
 
                     # if line contains ";LAYER_CHANGE", do job.currentLayerHeight(the next line)
@@ -490,131 +489,140 @@ class Printer(db.Model):
                             job.setCurrentLayerHeight(current_layer_height)
                     prev_line = line
 
-                    # remove whitespace
+                    # Strip out all lines that begin with ; and are empty. 
+                    # Sending comments to printers "breaks" the sendGcode function. 
                     line = line.strip()
-                    # Don't send empty lines and comments. ";" is a comment in gcode.
-                    if ";" in line:  # Remove inline comments
+                    if ";" in line:
                         line = line.split(";")[
                             0
-                        ].strip()  # Remove comments starting with ";"
-
+                        ].strip() 
                     if len(line) == 0 or line.startswith(";"):
                         continue
 
+                    # We are using the "M569" command to detect the start of the print. 
+                    # This is hardcoded for prusa so we may need a better solution going forward, as idk 
+                    # if this is a universal command.
                     if("M569" in line) and job.getTimeStarted()==0:
-                        job.setTimeStarted(1)
+                        job.setTimeStarted(1) 
                         job.setTime(job.calculateEta(), 1)
                         job.setTime(datetime.now(), 2)
                  
+                    # Send the line to the printer
                     res = self.sendGcode(line)
                     
+                    # If the job was paused and now needs to be marked as resumed, do so. However, if the user 
+                    # cancelled the print (which sets the status to complete), return "cancelled" to break out of the loop.
                     if(job.getFilePause() == 1):
-                        # self.setStatus("printing")
                         job.setTime(job.colorEta(), 1)
                         job.setTime(job.calculateColorChangeTotal(), 0)
                         job.setTime(datetime.min, 3)
                         job.setFilePause(0)
                         if(self.getStatus()=="complete"):
                             return "cancelled"
-                        self.setStatus("printing")
-                    
+                        self.setStatus("printing") # Set status back to printing instead of paused. 
+
+                    # If color change is detected in-line, set the status and indicate that the file is paused. 
                     if("M600" in line):
                         job.setTime(datetime.now(), 3)
-                        # job.setTime(job.calculateTotalTime(), 0)
-                        # job.setTime(job.updateEta(), 1)
                         self.setStatus("colorchange")
-                        # self.setColorChangeBuffer(3)
-                        # self.setColorChangeBuffer(1)
                         job.setFilePause(1)
 
+                    # If M569 is in line, thats command for first extrude. 
                     if("M569" in line) and (job.getExtruded()==0):
                         job.setExtruded(1)
                     
                     if self.prevMes == "M602":
                         self.prevMes=""
-                             
-                #  software pausing        
+                                
+                    # If the user set the status to "paused," send the pause command. Stay in the while True loop until the 
+                    # user sets the status back to "printing."
                     if (self.getStatus()=="paused"):
-                        # self.prevMes = "M601"
-                        self.sendGcode("M601") # pause command for prusa
+                        self.sendGcode("M601") 
                         job.setTime(datetime.now(), 3)
                         while(True):
                             time.sleep(1)
                             stat = self.getStatus()
                             if(stat=="printing"):
                                 self.prevMes = "M602"
-
                                 self.sendGcode("M602") # resume command for prusa
-
                                 time.sleep(2)
                                 job.setTime(job.colorEta(), 1)
                                 job.setTime(job.calculateColorChangeTotal(), 0)
                                 job.setTime(datetime.min, 3)
                                 break
                     
-                    # software color change
+                    # If the user set the status to colorchange and the layer is complete (color buffer is 1), and 
+                    # it isn't already "paused" (file pause == 0), send m600 command to initiate color change sequence.
                     if (self.getStatus()=="colorchange" and job.getFilePause()==0 and self.colorbuff==1):
                         job.setTime(datetime.now(), 3)
-                        # job.setTime(job.calculateTotalTime(), 0)
-                        # job.setTime(job.updateEta(), 1)
-                        self.sendGcode("M600") # color change command
+                        self.sendGcode("M600") # "Stuck" here until user changes filament on LCD screen 
                         job.setTime(job.colorEta(), 1)
                         job.setTime(job.calculateColorChangeTotal(), 0)
                         job.setTime(datetime.min, 3)
                         job.setFilePause(1)
                         self.setColorChangeBuffer(0)
-                        # self.setStatus("printing")
 
-                    # Increment the sent lines
+                    # Calculate progress for progress bar 
                     sent_lines += 1
                     job.setSentLines(sent_lines)
-                    # Calculate the progress
                     progress = (sent_lines / total_lines) * 100
-
-                    # Call the setProgress method
                     job.setProgress(progress)
                 
-                    
-                    # if self.getStatus() == "complete" and job.extruded != 0:
+                    # If the user cancelled the print, status is set to "complete" so return cancelled. 
                     if self.getStatus() == "complete":
                         return "cancelled"
 
+                    # If an above function reached an exception, it sets the status to error. Return "error" and break 
+                    # out of the loop if this is the case. 
                     if self.getStatus() == "error":
                         return "error"
-
-            return "complete"
+                    
+            return "complete"  # Return complete after all of the lines have been sent to the printer. 
         except Exception as e:
-            # self.setStatus("error")
             self.setError(e)
             return "error"
 
-    # Function to send "ending" gcode commands
+    """
+        Every printer has a different "ending" sequence. We found this somewhere in the prusa github in a big JSON file 
+        with a bunch of different printer's "ending" sequences to home printer, turn off fans, etc. 
+    """
     def endingSequence(self, job=None):
         try:
             # *** Prusa MK4 ending sequence ***
-            # self.gcodeEnding("{if layer_z < max_print_height}G1 Z{z_offset+min(layer_z+1, max_print_height)} F720 ; Move print head up{endif}")
             self.gcodeEnding("M104 S0")# ; turn off temperature
             self.gcodeEnding("M140 S0")# ; turn off heatbed
             self.gcodeEnding("M107")# ; turn off fan
 
+            # If the printer started printing (extruded first line), also "park" the nozzle to the corner. 
+            # Otherwise, just do the other commands to turn off temps. We were having issues with making the printer 
+            # "park" and move if it hasn't extruded yet.
             if(job and job.getExtruded()==1):
                 self.gcodeEnding("G1 X241 Y170 F3600")# ; park
-            # self.gcodeEnding("{if layer_z < max_print_height}G1 Z{z_offset+min(layer_z+23, max_print_height)} F300")# ; Move print head up{endif}
                 self.gcodeEnding("G4")# ; wait
 
             self.gcodeEnding("M900 K0")# ; reset LA
             self.gcodeEnding("M142 S36")# ; reset heatbreak target temp
             self.gcodeEnding("M84 X Y E")# ; disable motors   
-
         except Exception as e:
             self.setError(e)
             return "error"
 
+    """
+        When the printer's status gets set to "ready," the target function of each thread in PrinterStatusService 
+        will call this function to print the next job in the queue.
+        
+        First, it gets the next job in the queue. Then, it sets the printer status to "printing" and sends the status. It stays in the 
+        while loop in self.beginPrint until the user clicks "start print" on the frontend. The system checks if the 
+        printer's port it was registered under is the same it is now connected to, and re-registeres the port if not. 
+        
+        The code connecs to the serial port, saves the job's file to the uploads folder, and enters the parseGcode function 
+        to loop through the entire file and send each line to the printer. After the file is done, it returns cancelled, complete, or error 
+        to "verdict" and the verdict is "handled" by self.handleVerdict. 
+    """
     def printNextInQueue(self):
-        # self.connect()
-        job = self.getQueue().getNext()  # get next job
+        job = self.getQueue().getNext()
         try:
-            self.setStatus("printing")  # set printer status to printing
+            self.setStatus("printing")
             self.sendStatusToJob(job, job.id, "printing")
 
             begin = self.beginPrint(job)
@@ -631,7 +639,6 @@ class Printer(db.Model):
                     job.removeFileFromPath(path)  # remove file from folder after job complete
                 else:
                     self.getQueue().deleteJob(job.id, self.id)
-                    # self.setStatus("error")
                     self.setError("Printer not connected")
                     self.sendStatusToJob(job, job.id, "error")
             else: 
@@ -643,15 +650,22 @@ class Printer(db.Model):
             self.setStatus("error")
             self.sendStatusToJob(job, job.id, "error")
             return 
-            # self.handleVerdict("error", job)
 
+    """
+        Sends the error message to the frontend to display to the user. 
+    """
     def setErrorMessage(self, error):
         self.error = str(error)
         self.setStatus("error")
         current_app.socketio.emit(
             "error_update", {"printerid": self.id, "error": self.error}
         )
-            
+  
+    """
+        The thread is "stuck" here until the user clicks "Start Print" on the frontend. When the user clicks start, the 
+        job's "released" flag is set to 1 and the thread can continue. If the user cancels the print, the status is set to
+        "cancelled" and the file is never sent to the printer. 
+    """          
     def beginPrint(self, job): 
         while True: 
             time.sleep(1)
@@ -659,20 +673,28 @@ class Printer(db.Model):
                 return True 
             if self.getStatus() == "complete": 
                 return False 
-            
+    
+    """
+        After the printer is finished printing, depending on what was returned by parseGcode, the verdict is handled here.
+        If the entire file was sent to the printer, verdict is "complete" so status of job/printer is complete. 
+        
+        If an exception was reached or printer errored, verdict is "error" so status of job/printer is error.
+        
+        If the printer's status was set to "complete" mid-print, the loop stops and returns "cancelled." Status of 
+        job is set to cancelled and status of printer is complete. 
+        
+        If the user clicked "stop" and never clicked "start print," verdict is "misprint" and the status of the job is cancelled.
+    """        
     def handleVerdict(self, verdict, job):
-        # self.disconnect()
         if verdict == "complete":
             self.disconnect()
             self.setStatus("complete")
             self.sendStatusToJob(job, job.id, "complete")
-            
         elif verdict == "error":
             self.disconnect()
             self.getQueue().deleteJob(job.id, self.id)
             self.setStatus("error")
             self.sendStatusToJob(job, job.id, "error")
-            # self.setError("Error")
         elif verdict == "cancelled":
             self.endingSequence(job)
             self.sendStatusToJob(job, job.id, "cancelled")
@@ -681,11 +703,64 @@ class Printer(db.Model):
             self.sendStatusToJob(job, job.id, "cancelled")            
         return 
     
+    """
+        Check if file was saved to the uploads folder 
+    """
     def fileExistsInPath(self, path):
         if os.path.exists(path):
             return True
 
-    # printer-specific classes
+    """
+        To avoid circular imports/application out of context errors, we can only "reach" functions located inside the 
+        job model through the controller/routes. This is how we set status of job in the database. The in-memory job status 
+        can be set without sending it through the controller. 
+    """
+    def sendStatusToJob(self, job, job_id, status):
+        try:
+            job.setStatus(status) # Setting status in-memory 
+            data = {
+                "printerid": self.id,
+                "jobid": job_id,
+                "status": status,
+            }
+            base_url = os.getenv('BASE_URL')
+            response = requests.post(f"{base_url}/updatejobstatus", json=data) # Setting status of job in the database
+            if response.status_code == 200:
+                print("Status sent successfully")
+            else:
+                print("Failed to send status:", response.text)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to send status to job: {e}")
+
+    """
+       This function is located inside of the controller/routes. Explanation in the function itself. Basically 
+       checks what port the registered printer is currently attached to. 
+    """
+    @classmethod 
+    def repairPorts(cls):
+        try:
+            base_url = os.getenv('BASE_URL')
+            response = requests.post(f"{base_url}/repairports")
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to repair ports: {e}")
+  
+    """
+       This function is located inside of the controller/routes. Explanation in the function itself. Basically 
+       deletes / restores a printer thread and returns it to the target function. 
+    """          
+    @classmethod 
+    def hardReset(cls, printerid):
+        try:
+            base_url = os.getenv('BASE_URL')
+            response = requests.post(f"{base_url}/hardreset", json={'printerid': printerid, 'restore': 1})
+
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to repair ports: {e}")   
+            
+            
+    """
+        Getters 
+    """
     def getDevice(self):
         return self.device
 
@@ -695,14 +770,6 @@ class Printer(db.Model):
     def getHwid(self):
         return self.hwid
     
-    def setQueue(self, queue): 
-        self.queue = queue
-
-    # def removeJobFromQueue(self, job_id):
-    #     self.queue.removeJob(job_id)
-
-    #     current_app.socketio.emit('job_removed', {'printer_id': self.id, 'job_id': job_id})
-
     def getStatus(self):
         return self.status
 
@@ -717,20 +784,18 @@ class Printer(db.Model):
 
     def getStopPrint(self):
         return self.stopPrint
-
-    def setSer(self, port):
-        self.ser = port
-
-    def setDevice(self, device): 
-        self.device = device 
-
-    #  now when we set the status, we can emit the status to the frontend
-
+    
+    """
+        Setters 
+    """
+    """
+        Perform hard reset on printer if the status was error and the user sets printer to ready. 
+        Otherwise, just update the status and also update it on the frontend. 
+    """
     def setStatus(self, newStatus):
         try:
             if(self.status == "error" and newStatus!="error"): 
                 Printer.hardReset(self.id)
-            
             self.status = newStatus
             current_app.socketio.emit(
                 "status_update", {"printer_id": self.id, "status": newStatus}
@@ -738,9 +803,10 @@ class Printer(db.Model):
         except Exception as e:
             print("Error setting status:", e)
 
-    def setStopPrint(self, stopPrint):
-        self.stopPrint = stopPrint
 
+    """
+        Disconnect from port on error. Set error message and send to frontend. 
+    """
     def setError(self, error):
         self.disconnect()
         self.error = str(error)
@@ -749,48 +815,14 @@ class Printer(db.Model):
             "error_update", {"printerid": self.id, "error": self.error}
         )
 
-    def sendStatusToJob(self, job, job_id, status):
-        try:
-            job.setStatus(status)
-            data = {
-                "printerid": self.id,
-                "jobid": job_id,
-                "status": status,  # Assuming status is accessible here
-            }
-            
-            base_url = os.getenv('BASE_URL')
-            response = requests.post(f"{base_url}/updatejobstatus", json=data)
-            if response.status_code == 200:
-                print("Status sent successfully")
-            else:
-                print("Failed to send status:", response.text)
-        except requests.exceptions.RequestException as e:
-            print(f"Failed to send status to job: {e}")
-
-    @classmethod 
-    def repairPorts(cls):
-        try:
-            base_url = os.getenv('BASE_URL')
-            response = requests.post(f"{base_url}/repairports")
-
-        except requests.exceptions.RequestException as e:
-            print(f"Failed to repair ports: {e}")
-            
-    @classmethod 
-    def hardReset(cls, printerid):
-        try:
-            base_url = os.getenv('BASE_URL')
-            response = requests.post(f"{base_url}/hardreset", json={'printerid': printerid, 'restore': 1})
-
-        except requests.exceptions.RequestException as e:
-            print(f"Failed to repair ports: {e}")   
-
+    """
+        Send bed/nozzle temperature to frontend.
+    """
     def setTemps(self, extruder_temp, bed_temp):
         self.extruder_temp = extruder_temp
         self.bed_temp = bed_temp
         current_app.socketio.emit(
             'temp_update', {'printerid': self.id, 'extruder_temp': self.extruder_temp, 'bed_temp': self.bed_temp})
-
 
     def setCanPause(self, canPause):
         try:
@@ -802,7 +834,15 @@ class Printer(db.Model):
     def setColorChangeBuffer(self, buff): 
         self.colorbuff = buff
         current_app.socketio.emit('color_buff', {'printerid': self.id, 'colorChangeBuffer': buff})
+        
+    def setQueue(self, queue): 
+        self.queue = queue
 
+    def setSer(self, port):
+        self.ser = port
 
-            
-            
+    def setDevice(self, device): 
+        self.device = device 
+
+    def setStopPrint(self, stopPrint):
+        self.stopPrint = stopPrint
