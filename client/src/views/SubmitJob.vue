@@ -149,6 +149,10 @@ const onlyNumber = ($event: KeyboardEvent) => {
     }
 }
 
+/*
+    Used when the user is submitting a job. If no printer is selected (selectedPrinters.value.length == 0), use the auto 
+    function. Else, evenly split jobs amongst all selected printers. 
+*/
 const handleSubmit = async () => {
     isLoading.value = true
     let isFavoriteSet = false;
@@ -156,8 +160,8 @@ const handleSubmit = async () => {
     if (selectedPrinters.value.length == 0) {
         let numPrints = quantity.value
         for (let i = 0; i < numPrints; i++) {
-            const formData = new FormData() // create FormData object
-            formData.append('file', file.value as File) // append form data
+            const formData = new FormData() 
+            formData.append('file', file.value as File) 
             formData.append('name', name.value as string)
             formData.append('priority', priority.value.toString())
             formData.append('td_id', tdid.value.toString())
@@ -170,11 +174,7 @@ const handleSubmit = async () => {
                 formData.append('favorite', 'false')
             }
             try {
-                // formData.append("quantity", quantity.value.toString())
                 res = await auto(formData)
-                // if (form.value) {
-                //     form.value.reset()
-                // }
             } catch (error) {
                 console.error('There has been a problem with your fetch operation:', error)
             }
@@ -211,11 +211,6 @@ const handleSubmit = async () => {
 
                     try {
                         res = await addJobToQueue(formData)
-                        // reset form
-                        // if (form.value) {
-                        //     form.value.reset()
-                        // }
-                        // reset Vue refs
                     } catch (error) {
                         console.error('There has been a problem with your fetch operation:', error)
                     }

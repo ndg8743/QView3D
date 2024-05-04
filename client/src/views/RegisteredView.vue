@@ -118,6 +118,8 @@ const doRepair = async () => {
     isLoading.value = false
 }
 
+//   Tells user if printer is connected to a serial port or not and if the port it is registered under 
+//   is the port that the printer is currently connected to.
 const doDiagnose = async (printer: Device) => {
     isLoading.value = true
     message.value = `Diagnosing <b>${printer.name}</b>:<br/><br/>This printer is registered under port <b>${printer.device}</b>.`

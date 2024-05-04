@@ -389,6 +389,9 @@ const closeDropdown = (evt: any) => {
     }
 }
 
+/*
+    Gets all jobs displayed in Job History in CSV after filter appliied (or all jobs if no filter)
+*/
 const doDownloadCsv = async () => {
     isLoading.value = true
     const printerIds = selectedPrinters.value.map(p => p).filter(id => id !== undefined) as number[];
