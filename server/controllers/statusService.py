@@ -5,15 +5,9 @@ from models.jobs import Job
 
 status_bp = Blueprint("status", __name__)
 
-@status_bp.route('/ping', methods=["GET"])
-def getStatus(Printer):
-    pass
-
-@status_bp.route('/getopenthreads')
-def getOpenThreads():
-    pass 
-
-# this is the route that will be called by the UI to get the printers that have threads information
+"""
+    Returns all printer threads to frontend. This is the main method to display in-memory data and printer queues. 
+"""
 @status_bp.route('/getprinterinfo', methods=["GET"])
 def getPrinterInfo():
     try: 
@@ -23,18 +17,23 @@ def getPrinterInfo():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
 
+"""
+    route to delete thread from in-memory data and recreate it. 
+"""
 @status_bp.route('/hardreset', methods=["POST"])
 def hardreset():
     try: 
-        data = request.get_json() # get json data 
+        data = request.get_json() 
         id = data['printerid']
-        restore = data.get('restore', 0)  # default value is False
         res = printer_status_service.resetThread(id)
         return res 
     except Exception as e:
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Deletes printer thread. This is used when the user deregisters a printer. 
+"""
 @status_bp.route("/removethread", methods=["POST"])
 def removeThread():
     try:
@@ -46,6 +45,10 @@ def removeThread():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
+"""
+    Edits name of printer in-memory. When the user edits the name of the printer, the in-memory printer name
+    is also updated. In-database name also updated in ports.py 
+"""
 @status_bp.route("/editNameInThread", methods=["POST"])
 def editName(): 
     try: 
