@@ -74,6 +74,8 @@ const handleRerun = async (job: Job, printer: Device) => {
   await rerunJob(job, printer)
 }
 
+// if the user selects to delete a job from the queue
+// we get the selected jobs and remove them from the queue
 const deleteSelectedJobs = async () => {
   isLoading.value = true
   let response = null
@@ -95,6 +97,9 @@ const deleteSelectedJobs = async () => {
   isLoading.value = false
 }
 
+// this is for the select all jobs checkbox for each printer
+// when you click it, all the jobs in queue for that printer will be selected
+// and when you click the checkbox for all the jobs in queue, the selectAllJobs checkbox will be selected as well
 const selectAllJobs = (printer: Device) => computed({
   get: () => {
     if (printer.queue?.length === 0) {
@@ -107,6 +112,7 @@ const selectAllJobs = (printer: Device) => computed({
   }
 });
 
+// when the printers change, we update the selected jobs accordingly
 watch(printers, (printers) => {
   selectedJobs.value = printers.flatMap((printer) => printer.queue?.filter((job) => job.queue_selected) || [])
 }, { deep: true })
