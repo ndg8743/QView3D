@@ -7,6 +7,9 @@ import JobHistoryVue from '@/views/JobHistory.vue'
 import ErrorView from '@/views/ErrorView.vue'
 import { isLoading } from '@/model/jobs'
 
+// this is the router configuration for the Vue app
+// it defines the routes and the components that
+// should be displayed when the user navigates to a specific route
 const routes = [
   {
     path: '/',
@@ -40,6 +43,7 @@ const routes = [
   }, 
 ]
 
+// create the router instance
 const router = createRouter({
   history: createWebHashHistory(),
   routes

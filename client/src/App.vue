@@ -3,13 +3,17 @@ import 'bootstrap/dist/js/bootstrap.bundle'
 import { RouterView } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import ThemePanel from './components/ThemePanel.vue'
-import { onMounted, nextTick, watch } from 'vue';
+import { onMounted } from 'vue';
 import { setupPortRepairSocket, setupErrorSocket, setupJobStatusSocket, setupPauseFeedbackSocket, setupProgressSocket, setupQueueSocket, setupReleaseSocket, setupStatusSocket, setupTempSocket, setupGCodeViewerSocket, setupExtrusionSocket, setupCurrentLayerHeightSocket, setupMaxLayerHeightSocket } from './model/sockets';
 import { useRetrievePrintersInfo, printers } from './model/ports';
 import { setupTimeSocket, isLoading } from './model/jobs';
 
+// method to be used in the component
 const { retrieveInfo } = useRetrievePrintersInfo();
 
+// when the component is mounted
+// printers is loaded based on the retrieved info
+// all sockets are set up when the app is mounted
 onMounted(async () => {
   printers.value = await retrieveInfo()
 
@@ -32,6 +36,10 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- 
+    loading modal
+    whenever loading is true, this modal will be shown
+   -->
   <transition name="fade">
     <div v-if="isLoading" class="modal fade show d-block" id="loadingModal" tabindex="-1"
       aria-labelledby="loadingModalLabel" aria-hidden="true"
@@ -47,6 +55,12 @@ onMounted(async () => {
     </div>
   </transition>
 
+  <!-- 
+    The main app
+    The navbar is at the top
+    The router view is in the middle
+    The theme panel is at the bottom
+   -->
   <nav style="padding-bottom: 2.5rem;">
     <NavBar />
   </nav>
