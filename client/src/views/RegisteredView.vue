@@ -257,7 +257,7 @@ const doCloseRegisterModal = async () => {
                                                 @click="toggleMessage(printer)">
                                                 <i class="fas fa-stethoscope"></i>
                                                 <span class="ms-2">{{ messageId == printer.id && showMessage ?
-                                                    'Clear Message' : 'Diagnose Printer' }}</span>
+                        'Clear Message' : 'Diagnose Printer' }}</span>
                                             </a>
                                         </li>
                                     </ul>

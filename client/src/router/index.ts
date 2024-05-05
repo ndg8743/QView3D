@@ -35,12 +35,12 @@ const routes = [
     path: '/history',
     name: 'JobHistoryVue',
     component: JobHistoryVue
-  }, 
+  },
   {
     path: '/error',
     name: 'ErrorView',
     component: ErrorView
-  }, 
+  }
 ]
 
 // create the router instance

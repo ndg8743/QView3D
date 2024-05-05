@@ -449,15 +449,17 @@ a {
     color: var(--bs-primary-font-color, #fff);
 }
 
-.btn-link, .routerLink {
+.btn-link,
+.routerLink {
     color: var(--bs-primary-color, #7561a9);
 }
 
-a:hover{
+a:hover {
     color: var(--bs-primary-font-color, #fff);
 }
 
-.btn-link:hover, .routerLink:hover {
+.btn-link:hover,
+.routerLink:hover {
     color: var(--bs-primary-color-hover, #5e548e);
 }
 
@@ -465,7 +467,8 @@ a:active {
     color: var(--bs-primary-font-color, #fff) !important;
 }
 
-.btn-link:active, .routerLink:active {
+.btn-link:active,
+.routerLink:active {
     color: var(--bs-primary-color-active, #51457c) !important;
 }
 

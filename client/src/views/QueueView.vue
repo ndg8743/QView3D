@@ -299,9 +299,9 @@ const openModal = async (job: Job, printerName: string) => {
                 </span>
               </span>
               <span v-if="printer.queue?.length != 1" style="position: absolute; right: 50px;">{{ printer.queue?.length
-                || 0 }} jobs in queue</span>
+      || 0 }} jobs in queue</span>
               <span v-if="printer.queue?.length == 1" style="position: absolute; right: 50px;">{{ printer.queue?.length
-                || 0 }} job in queue</span>
+      || 0 }} job in queue</span>
             </b>
           </button>
         </h2>

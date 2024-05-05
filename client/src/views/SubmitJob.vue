@@ -162,8 +162,8 @@ const handleSubmit = async () => {
     if (selectedPrinters.value.length == 0) {
         let numPrints = quantity.value
         for (let i = 0; i < numPrints; i++) {
-            const formData = new FormData() 
-            formData.append('file', file.value as File) 
+            const formData = new FormData()
+            formData.append('file', file.value as File)
             formData.append('name', name.value as string)
             formData.append('priority', priority.value.toString())
             formData.append('td_id', tdid.value.toString())
@@ -230,7 +230,8 @@ const handleSubmit = async () => {
         toast.error('Failed to add job to queue. Unexpected response.')
     }
     setTimeout(() => {
-        router.go(0)}, 500);
+        router.go(0)
+    }, 500);
 
     isLoading.value = false
     isAsteriksVisible.value = true
