@@ -94,7 +94,6 @@ export function useRetrievePrinters() {
   }
 }
 
-
 /*
   Main function to retrieve thread data from backend and store it in the printers variable.
 */

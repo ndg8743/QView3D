@@ -48,7 +48,6 @@ class Job(db.Model):
     released = 0 # 0 if not released, 1 if released by user (Start Print button)
     filePause = 0 # Indicates if paused by user 
     progress = 0.0
-    sent_lines = 0 # Stores # of lines of file sent to user 
     time_started = 0
     extruded = 0
     
@@ -69,7 +68,6 @@ class Job(db.Model):
         self.released = 0 
         self.filePause = 0
         self.progress = 0.0
-        self.sent_lines = 0
         self.time_started = 0
         self.extruded = 0
         self.job_time = [0, datetime.min, datetime.min, datetime.min]
@@ -617,9 +615,6 @@ class Job(db.Model):
     
     def getProgress(self):
         return self.progress
-    
-    def getSentLines(self):
-        return self.sent_lines
 
     def getTimeStarted(self):
         return self.time_started
@@ -662,10 +657,6 @@ class Job(db.Model):
             # Emit a 'progress_update' event with the new progress
             current_app.socketio.emit(
                 'progress_update', {'job_id': self.id, 'progress': self.progress})
-    
-    def setSentLines(self, sent_lines):
-        self.sent_lines = sent_lines
-        current_app.socketio.emit('gcode_viewer', {'job_id': self.id, 'gcode_num': self.sent_lines})
     
     def setMaxLayerHeight(self, max_layer_height):
         self.max_layer_height = max_layer_height

@@ -31,7 +31,6 @@ export interface Job {
   date?: Date
   status?: string
   progress?: number //store progress of job
-  gcode_num?: number //store gcode of job
   printer: string //store printer name
   printerid: number
 
@@ -62,7 +61,7 @@ export interface Job {
   }
   timer?: NodeJS.Timeout
   time_started?: number
-  colorbuff?: number 
+  colorbuff?: number
   printer_name?: string
   queue_selected?: boolean
 }
@@ -77,8 +76,7 @@ export interface Job {
 */
 export async function jobTime(job: Job, printers: any) {
   if (printers) {
-
-    // Instantiate job_client 
+    // Instantiate job_client
     if (!job.job_client) {
       job.job_client = {
         total_time: 0,
@@ -93,7 +91,7 @@ export async function jobTime(job: Job, printers: any) {
     if (!job.job_server) {
       job.job_server = [0, '00:00:00', '00:00:00', '00:00:00']
 
-      // Fetch static time data from backend and update job_server. This is necessary because when the user reloads the page, 
+      // Fetch static time data from backend and update job_server. This is necessary because when the user reloads the page,
       // the in-memory job_server data is lost. This repopulates the job_server data so job_client can calculate the dynamic time data.
       for (const printer of printers.value) {
         if (printer.queue && printer.queue.length != 0 && printer.queue[0].status != 'inqueue') {
@@ -113,7 +111,7 @@ export async function jobTime(job: Job, printers: any) {
     const printerid = job.printerid
     const printer = printers.value.find((printer: { id: number }) => printer.id === printerid)
 
-    // Every second, update job time 
+    // Every second, update job time
     const updateJobTime = () => {
       if (printer.status !== 'printing') {
         clearInterval(job.timer)
@@ -138,11 +136,11 @@ export async function jobTime(job: Job, printers: any) {
         printer.status === 'paused'
       ) {
         const now = Date.now()
-        const elapsedTime = now - new Date(job.job_server![2]).getTime() // Elapsed time = now - time started 
+        const elapsedTime = now - new Date(job.job_server![2]).getTime() // Elapsed time = now - time started
         job.job_client!.elapsed_time = Math.round(elapsedTime / 1000) * 1000
         if (!isNaN(job.job_client!.elapsed_time)) {
           if (job.job_client!.elapsed_time <= job.job_client!.total_time) {
-            job.job_client!.remaining_time = // Remaining time = total time - elapsed time 
+            job.job_client!.remaining_time = // Remaining time = total time - elapsed time
               job.job_client!.total_time - job.job_client!.elapsed_time
           }
         }
@@ -150,7 +148,7 @@ export async function jobTime(job: Job, printers: any) {
 
       if (job.job_client!.elapsed_time > job.job_client!.total_time) {
         //@ts-ignore
-        job.job_client!.extra_time = Date.now() - eta // Extra time = now - eta 
+        job.job_client!.extra_time = Date.now() - eta // Extra time = now - eta
       }
 
       // Update elapsed_time after the first second
@@ -345,7 +343,7 @@ export function useRerunJob() {
         let printerpk = printer.id
         let jobpk = job?.id
 
-        const response = await api('rerunjob', { jobpk, printerpk }) 
+        const response = await api('rerunjob', { jobpk, printerpk })
         if (response) {
           if (response.success == false) {
             toast.error(response.message)
@@ -390,37 +388,6 @@ export function useRemoveJob() {
 }
 
 /*
-  Not sure if we use this anymore, used to change position of jobs in queue 
-*/
-export function bumpJobs() {
-  return {
-    async bumpjob(job: Job, printer: Device, choice: number) {
-      try {
-        let printerid = printer.id
-        let jobid = job.id
-        const response = await api('bumpjob', { printerid, jobid, choice })
-        if (response) {
-          if (response.success == false) {
-            toast.error(response.message)
-          } else if (response.success === true) {
-            toast.success(response.message)
-          } else {
-            console.error('Unexpected response:', response)
-            toast.error('Failed to bump job. Unexpected response.')
-          }
-        } else {
-          console.error('Response is undefined or null')
-          toast.error('Failed to bump job. Unexpected response')
-        }
-      } catch (error) {
-        console.error(error)
-        toast.error('An error occurred while bumping the job')
-      }
-    }
-  }
-}
-
-/*
   The "key" parameter indicates if the user clicked clear, clear & rerun, or fail. This removes the job from the queue 
   after its done printing. 
 */
@@ -452,24 +419,8 @@ export function useReleaseJob() {
 }
 
 /*
-
-*/
-export function useGetGcode() {
-  return {
-    async getgcode(job: Job) {
-      try {
-        const response = await api('getgcode', job)
-        return response
-      } catch (error) {
-        console.error(error)
-        toast.error('An error occurred while retrieving the gcode')
-      }
-    }
-  }
-}
-
-/*
-
+  called when the user clicks "download" on a job
+  it retrieves the file from the job from the backend and downloads it to the user's computer
 */
 export function useGetJobFile() {
   return {
@@ -487,6 +438,11 @@ export function useGetJobFile() {
   }
 }
 
+/*
+  same as download, but doesn't download the file to the user's computer
+  and instead returns the file to the caller
+  used for the gcode viewers
+*/
 export function useGetFile() {
   return {
     async getFile(job: Job): Promise<File | undefined> {
@@ -505,7 +461,7 @@ export function useGetFile() {
 }
 
 /*
-  Removes files from database >6 months old 
+  Removes files from database > 6 months old 
 */
 export function useClearSpace() {
   return {
@@ -689,12 +645,15 @@ export function useDownloadCsv() {
 
         const blob = await response.blob() // Convert the response to a blob
         const date = new Date()
-        const dateString = ('0' + (date.getMonth() + 1)).slice(-2) + ('0' + date.getDate()).slice(-2) + date.getFullYear();
+        const dateString =
+          ('0' + (date.getMonth() + 1)).slice(-2) +
+          ('0' + date.getDate()).slice(-2) +
+          date.getFullYear()
         const filename = `jobs_${dateString}.csv`
 
-        saveAs(blob, filename) // saves file 
+        saveAs(blob, filename) // saves file
 
-        await deleteCSVFromServer() // Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder 
+        await deleteCSVFromServer() // Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder
       } catch (error) {
         console.error('An error occurred while downloading the CSV:', error)
         toast.error('An error occurred while downloading the CSV')
@@ -703,8 +662,8 @@ export function useDownloadCsv() {
   }
 }
 
-// Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder. 
-// Called by useDownloadCSV. 
+// Calls backend to remove the CSV file from the server b/c it successfully downloaded to downloads folder.
+// Called by useDownloadCSV.
 export async function deleteCSVFromServer() {
   try {
     const response = await api(`removeCSV`)

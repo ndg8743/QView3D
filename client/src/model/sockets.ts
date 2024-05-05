@@ -1,6 +1,5 @@
 import { socket } from './myFetch'
 import type { Device } from './ports'
-import { jobTime } from './jobs'
 
 /*
     This file contains functions that set up the socket connection and event listeners for the client side.
@@ -9,7 +8,7 @@ import { jobTime } from './jobs'
 
 // *** PORTS ***
 
-// Update temperature data of printer 
+// Update temperature data of printer
 export function setupTempSocket(printers: any) {
   socket.on('temp_update', (data: any) => {
     const printer = printers.value.find((p: Device) => p.id === data.printerid)
@@ -34,7 +33,7 @@ export function setupStatusSocket(printers: any) {
   })
 }
 
-// Get updates for when backend queue changes 
+// Get updates for when backend queue changes
 export function setupQueueSocket(printers: any) {
   socket.on('queue_update', (data: any) => {
     if (printers) {
@@ -48,7 +47,7 @@ export function setupQueueSocket(printers: any) {
   })
 }
 
-// Printer error updates 
+// Printer error updates
 export function setupErrorSocket(printers: any) {
   socket.on('error_update', (data: any) => {
     if (printers) {
@@ -62,7 +61,7 @@ export function setupErrorSocket(printers: any) {
   })
 }
 
-// Printer paused updates 
+// Printer paused updates
 export function setupCanPauseSocket(printers: any) {
   socket.on('can_pause', (data: any) => {
     if (printers) {
@@ -112,7 +111,7 @@ export function setupTimeStartedSocket(printers: any) {
   })
 }
 
-// Constantly update progress bar of job 
+// Constantly update progress bar of job
 export function setupProgressSocket(printers: any) {
   socket.on('progress_update', (data: any) => {
     if (printers) {
@@ -150,7 +149,7 @@ export function setupReleaseSocket(printers: any) {
   })
 }
 
-// Job status updates from backend 
+// Job status updates from backend
 export function setupJobStatusSocket(printers: any) {
   socket.on('job_status_update', (data: any) => {
     if (printers) {
@@ -167,7 +166,7 @@ export function setupJobStatusSocket(printers: any) {
   })
 }
 
-// Ports on registeredview automatically updated when ports are updated before printer starts printing 
+// Ports on registeredview automatically updated when ports are updated before printer starts printing
 export function setupPortRepairSocket(printers: any) {
   socket.on('port_repair', (data: any) => {
     if (printers) {
@@ -179,24 +178,7 @@ export function setupPortRepairSocket(printers: any) {
   })
 }
 
-// 
-export function setupGCodeViewerSocket(printers: any) {
-  socket.on('gcode_viewer', (data: any) => {
-    if (printers) {
-      const job = printers.value
-        .flatMap((printer: { queue: any }) => printer.queue)
-        .find((job: { id: any }) => job?.id === data.job_id)
-
-      if (job) {
-        job.gcode_num = data.gcode_num
-      }
-    } else {
-      console.error('printers or printers.value is undefined')
-    }
-  })
-}
-
-// Update when job has had first extrusion. Then, the color change and pause buttons are no longer disabled. 
+// Update when job has had first extrusion. Then, the color change and pause buttons are no longer disabled.
 export function setupExtrusionSocket(printers: any) {
   socket.on('extruded_update', (data: any) => {
     if (printers) {
@@ -227,7 +209,7 @@ export function setupColorChangeBuffer(printers: any) {
   })
 }
 
-
+// Update the max layer height of the job
 export function setupMaxLayerHeightSocket(printers: any) {
   socket.on('max_layer_height', (data: any) => {
     if (printers) {
@@ -244,6 +226,7 @@ export function setupMaxLayerHeightSocket(printers: any) {
   })
 }
 
+// Update the current layer height of the job
 export function setupCurrentLayerHeightSocket(printers: any) {
   socket.on('current_layer_height', (data: any) => {
     if (printers) {
