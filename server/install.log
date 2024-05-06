@@ -1,0 +1,178 @@
+Requirement already satisfied: alembic==1.13.1 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 1)) (1.13.1)
+Collecting Flask==3.0.3
+  Downloading flask-3.0.3-py3-none-any.whl (101 kB)
+Requirement already satisfied: Flask_Cors==4.0.0 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 3)) (4.0.0)
+Requirement already satisfied: Flask_Migrate==4.0.5 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 4)) (4.0.5)
+Requirement already satisfied: Flask_SocketIO==5.3.6 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 5)) (5.3.6)
+Requirement already satisfied: flask_sqlalchemy==3.1.1 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 6)) (3.1.1)
+Requirement already satisfied: pyserial==3.5 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 7)) (3.5)
+Collecting python-dotenv==1.0.1
+  Downloading python_dotenv-1.0.1-py3-none-any.whl (19 kB)
+Collecting Requests==2.31.0
+  Using cached requests-2.31.0-py3-none-any.whl (62 kB)
+Requirement already satisfied: SQLAlchemy==2.0.25 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 10)) (2.0.25)
+Requirement already satisfied: tzlocal==5.2 in /opt/anaconda3/lib/python3.8/site-packages (from -r requirements.txt (line 11)) (5.2)
+Collecting Werkzeug==3.0.2
+  Downloading werkzeug-3.0.2-py3-none-any.whl (226 kB)
+Requirement already satisfied: importlib-metadata in /opt/anaconda3/lib/python3.8/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (3.10.0)
+Requirement already satisfied: typing-extensions>=4 in /opt/anaconda3/lib/python3.8/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (4.9.0)
+Requirement already satisfied: importlib-resources in /opt/anaconda3/lib/python3.8/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (6.1.1)
+Requirement already satisfied: Mako in /opt/anaconda3/lib/python3.8/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (1.3.2)
+Requirement already satisfied: click>=8.1.3 in /opt/anaconda3/lib/python3.8/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (8.1.7)
+Requirement already satisfied: Jinja2>=3.1.2 in /opt/anaconda3/lib/python3.8/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (3.1.3)
+Requirement already satisfied: itsdangerous>=2.1.2 in /opt/anaconda3/lib/python3.8/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (2.1.2)
+Requirement already satisfied: blinker>=1.6.2 in /opt/anaconda3/lib/python3.8/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (1.7.0)
+Requirement already satisfied: python-socketio>=5.0.2 in /opt/anaconda3/lib/python3.8/site-packages (from Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (5.11.2)
+Requirement already satisfied: charset-normalizer<4,>=2 in /opt/anaconda3/lib/python3.8/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (3.1.0)
+Requirement already satisfied: idna<4,>=2.5 in /opt/anaconda3/lib/python3.8/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2.10)
+Requirement already satisfied: certifi>=2017.4.17 in /opt/anaconda3/lib/python3.8/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2020.12.5)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/anaconda3/lib/python3.8/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (1.26.4)
+Requirement already satisfied: greenlet!=0.4.17 in /opt/anaconda3/lib/python3.8/site-packages (from SQLAlchemy==2.0.25->-r requirements.txt (line 10)) (1.0.0)
+Requirement already satisfied: backports.zoneinfo in /opt/anaconda3/lib/python3.8/site-packages (from tzlocal==5.2->-r requirements.txt (line 11)) (0.2.1)
+Requirement already satisfied: MarkupSafe>=2.1.1 in /opt/anaconda3/lib/python3.8/site-packages (from Werkzeug==3.0.2->-r requirements.txt (line 12)) (2.1.5)
+Requirement already satisfied: zipp>=0.5 in /opt/anaconda3/lib/python3.8/site-packages (from importlib-metadata->alembic==1.13.1->-r requirements.txt (line 1)) (3.4.1)
+Requirement already satisfied: python-engineio>=4.8.0 in /opt/anaconda3/lib/python3.8/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (4.9.0)
+Requirement already satisfied: bidict>=0.21.0 in /opt/anaconda3/lib/python3.8/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.23.1)
+Requirement already satisfied: simple-websocket>=0.10.0 in /opt/anaconda3/lib/python3.8/site-packages (from python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.0.0)
+Requirement already satisfied: wsproto in /opt/anaconda3/lib/python3.8/site-packages (from simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: h11<1,>=0.9.0 in /opt/anaconda3/lib/python3.8/site-packages (from wsproto->simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.14.0)
+Installing collected packages: Werkzeug, Flask, Requests, python-dotenv
+  Attempting uninstall: Werkzeug
+    Found existing installation: werkzeug 3.0.1
+    Uninstalling werkzeug-3.0.1:
+      Successfully uninstalled werkzeug-3.0.1
+  Attempting uninstall: Flask
+    Found existing installation: flask 3.0.1
+    Uninstalling flask-3.0.1:
+      Successfully uninstalled flask-3.0.1
+  Attempting uninstall: Requests
+    Found existing installation: requests 2.28.2
+    Uninstalling requests-2.28.2:
+      Successfully uninstalled requests-2.28.2
+  Attempting uninstall: python-dotenv
+    Found existing installation: python-dotenv 1.0.0
+    Uninstalling python-dotenv-1.0.0:
+      Successfully uninstalled python-dotenv-1.0.0
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+conda-repo-cli 1.0.4 requires pathlib, which is not installed.
+anaconda-project 0.9.1 requires ruamel-yaml, which is not installed.
+sphinx 4.0.1 requires Jinja2<3.0,>=2.3, but you have jinja2 3.1.3 which is incompatible.
+sphinx 4.0.1 requires MarkupSafe<2.0, but you have markupsafe 2.1.5 which is incompatible.
+langchain 0.0.136 requires SQLAlchemy<2,>=1, but you have sqlalchemy 2.0.25 which is incompatible.
+Successfully installed Flask-3.0.3 Requests-2.31.0 Werkzeug-3.0.2 python-dotenv-1.0.1
+Error: Directory migrations already exists and is not empty
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.env] No changes in schema detected.
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+Uploads folder recreated as an empty directory.
+Requirement already satisfied: alembic==1.13.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 1)) (1.13.1)
+Requirement already satisfied: Flask==3.0.3 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 2)) (3.0.3)
+Requirement already satisfied: Flask_Cors==4.0.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 3)) (4.0.0)
+Collecting Flask_Migrate==4.0.5 (from -r requirements.txt (line 4))
+  Downloading Flask_Migrate-4.0.5-py3-none-any.whl.metadata (3.1 kB)
+Requirement already satisfied: Flask_SocketIO==5.3.6 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 5)) (5.3.6)
+Requirement already satisfied: flask_sqlalchemy==3.1.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 6)) (3.1.1)
+Requirement already satisfied: pyserial==3.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 7)) (3.5)
+Requirement already satisfied: python-dotenv==1.0.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 8)) (1.0.1)
+Collecting Requests==2.31.0 (from -r requirements.txt (line 9))
+  Downloading requests-2.31.0-py3-none-any.whl.metadata (4.6 kB)
+Collecting SQLAlchemy==2.0.25 (from -r requirements.txt (line 10))
+  Downloading SQLAlchemy-2.0.25-cp39-cp39-macosx_10_9_x86_64.whl.metadata (9.6 kB)
+Requirement already satisfied: tzlocal==5.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 11)) (5.2)
+Requirement already satisfied: Werkzeug==3.0.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 12)) (3.0.2)
+Requirement already satisfied: Mako in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (1.3.3)
+Requirement already satisfied: typing-extensions>=4 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (4.11.0)
+Requirement already satisfied: Jinja2>=3.1.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (3.1.3)
+Requirement already satisfied: itsdangerous>=2.1.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (2.2.0)
+Requirement already satisfied: click>=8.1.3 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (8.1.7)
+Requirement already satisfied: blinker>=1.6.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (1.7.0)
+Requirement already satisfied: importlib-metadata>=3.6.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (7.1.0)
+Requirement already satisfied: python-socketio>=5.0.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (5.11.2)
+Collecting charset-normalizer<4,>=2 (from Requests==2.31.0->-r requirements.txt (line 9))
+  Downloading charset_normalizer-3.3.2-cp39-cp39-macosx_10_9_x86_64.whl.metadata (33 kB)
+Requirement already satisfied: idna<4,>=2.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (1.26.2)
+Requirement already satisfied: certifi>=2017.4.17 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2020.12.5)
+Requirement already satisfied: greenlet!=0.4.17 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from SQLAlchemy==2.0.25->-r requirements.txt (line 10)) (3.0.3)
+Requirement already satisfied: MarkupSafe>=2.1.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Werkzeug==3.0.2->-r requirements.txt (line 12)) (2.1.5)
+Requirement already satisfied: zipp>=0.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from importlib-metadata>=3.6.0->Flask==3.0.3->-r requirements.txt (line 2)) (3.18.1)
+Requirement already satisfied: bidict>=0.21.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.23.1)
+Requirement already satisfied: python-engineio>=4.8.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (4.9.0)
+Requirement already satisfied: simple-websocket>=0.10.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.0.0)
+Requirement already satisfied: wsproto in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: h11<1,>=0.9.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from wsproto->simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.14.0)
+Downloading Flask_Migrate-4.0.5-py3-none-any.whl (21 kB)
+Downloading requests-2.31.0-py3-none-any.whl (62 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 591.9 kB/s eta 0:00:00
+Downloading SQLAlchemy-2.0.25-cp39-cp39-macosx_10_9_x86_64.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 397.0 kB/s eta 0:00:00
+Downloading charset_normalizer-3.3.2-cp39-cp39-macosx_10_9_x86_64.whl (122 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 122.5/122.5 kB 304.6 kB/s eta 0:00:00
+Installing collected packages: SQLAlchemy, charset-normalizer, Requests, Flask_Migrate
+  Attempting uninstall: SQLAlchemy
+    Found existing installation: SQLAlchemy 2.0.29
+    Uninstalling SQLAlchemy-2.0.29:
+      Successfully uninstalled SQLAlchemy-2.0.29
+  Attempting uninstall: Requests
+    Found existing installation: requests 2.25.1
+    Uninstalling requests-2.25.1:
+      Successfully uninstalled requests-2.25.1
+  Attempting uninstall: Flask_Migrate
+    Found existing installation: Flask-Migrate 4.0.7
+    Uninstalling Flask-Migrate-4.0.7:
+      Successfully uninstalled Flask-Migrate-4.0.7
+Successfully installed Flask_Migrate-4.0.5 Requests-2.31.0 SQLAlchemy-2.0.25 charset-normalizer-3.3.2
+Error: Directory migrations already exists and is not empty
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.env] No changes in schema detected.
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+Uploads folder recreated as an empty directory.
+Requirement already satisfied: alembic==1.13.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 1)) (1.13.1)
+Requirement already satisfied: Flask==3.0.3 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 2)) (3.0.3)
+Requirement already satisfied: Flask_Cors==4.0.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 3)) (4.0.0)
+Requirement already satisfied: Flask_Migrate==4.0.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 4)) (4.0.5)
+Requirement already satisfied: Flask_SocketIO==5.3.6 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 5)) (5.3.6)
+Requirement already satisfied: flask_sqlalchemy==3.1.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 6)) (3.1.1)
+Requirement already satisfied: pyserial==3.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 7)) (3.5)
+Requirement already satisfied: python-dotenv==1.0.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 8)) (1.0.1)
+Requirement already satisfied: Requests==2.31.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 9)) (2.31.0)
+Requirement already satisfied: SQLAlchemy==2.0.25 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 10)) (2.0.25)
+Requirement already satisfied: tzlocal==5.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 11)) (5.2)
+Requirement already satisfied: Werkzeug==3.0.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from -r requirements.txt (line 12)) (3.0.2)
+Requirement already satisfied: Mako in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (1.3.3)
+Requirement already satisfied: typing-extensions>=4 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from alembic==1.13.1->-r requirements.txt (line 1)) (4.11.0)
+Requirement already satisfied: Jinja2>=3.1.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (3.1.3)
+Requirement already satisfied: itsdangerous>=2.1.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (2.2.0)
+Requirement already satisfied: click>=8.1.3 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (8.1.7)
+Requirement already satisfied: blinker>=1.6.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (1.7.0)
+Requirement already satisfied: importlib-metadata>=3.6.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask==3.0.3->-r requirements.txt (line 2)) (7.1.0)
+Requirement already satisfied: python-socketio>=5.0.2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (5.11.2)
+Requirement already satisfied: charset-normalizer<4,>=2 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (3.3.2)
+Requirement already satisfied: idna<4,>=2.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (1.26.2)
+Requirement already satisfied: certifi>=2017.4.17 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Requests==2.31.0->-r requirements.txt (line 9)) (2020.12.5)
+Requirement already satisfied: greenlet!=0.4.17 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from SQLAlchemy==2.0.25->-r requirements.txt (line 10)) (3.0.3)
+Requirement already satisfied: MarkupSafe>=2.1.1 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from Werkzeug==3.0.2->-r requirements.txt (line 12)) (2.1.5)
+Requirement already satisfied: zipp>=0.5 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from importlib-metadata>=3.6.0->Flask==3.0.3->-r requirements.txt (line 2)) (3.18.1)
+Requirement already satisfied: bidict>=0.21.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.23.1)
+Requirement already satisfied: python-engineio>=4.8.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (4.9.0)
+Requirement already satisfied: simple-websocket>=0.10.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.0.0)
+Requirement already satisfied: wsproto in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: h11<1,>=0.9.0 in /Library/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages (from wsproto->simple-websocket>=0.10.0->python-engineio>=4.8.0->python-socketio>=5.0.2->Flask_SocketIO==5.3.6->-r requirements.txt (line 5)) (0.14.0)
+Error: Directory migrations already exists and is not empty
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.env] No changes in schema detected.
+Uploads folder recreated as an empty directory.
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+Uploads folder recreated as an empty directory.
