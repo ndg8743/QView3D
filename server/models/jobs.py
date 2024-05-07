@@ -5,6 +5,8 @@ import os
 import re
 from models.db import db
 from models.printers import Printer 
+from models.file import File 
+
 from models.issues import Issue  # assuming the Issue model is defined in the issue.py file in the models directory
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import Column, String, LargeBinary, DateTime, ForeignKey
@@ -27,7 +29,10 @@ from app import printer_status_service
 class Job(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
-    file = db.Column(db.LargeBinary(16777215), nullable=True)
+
+    file_id = db.Column(db.Integer, db.ForeignKey('file.id'), nullable=True)
+    file = db.relationship('File', backref='job', uselist=False)
+
     name = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False)
     date = db.Column(db.DateTime, default=lambda: datetime.now(
@@ -56,8 +61,7 @@ class Job(db.Model):
 
 
     
-    def __init__(self, file, name, printer_id, status, file_name_original, favorite, td_id, printer_name):
-        self.file = file 
+    def __init__(self, name, printer_id, status, file_name_original, favorite, td_id, printer_name):        
         self.name = name 
         self.printer_id = printer_id 
         self.status = status 
@@ -211,7 +215,6 @@ class Job(db.Model):
             printer = Printer.query.get(printer_id)
 
             job = cls(
-                file=compressed_data,
                 name=name,
                 printer_id=printer_id,
                 status=status,
@@ -220,7 +223,10 @@ class Job(db.Model):
                 td_id = td_id, 
                 printer_name = printer.name 
             )
-
+            
+            file = File(file=compressed_data)
+            job.file = file
+            
             db.session.add(job)
             db.session.commit()
 
@@ -347,7 +353,8 @@ class Job(db.Model):
 
             for job in old_jobs:
                 if(job.favorite==0):
-                    job.file = None  # Set file to None
+                    if job.file:
+                        db.session.delete(job.file)  # Delete the File instance
                     if "Removed after 6 months" not in job.file_name_original:
                         job.file_name_original = f"{job.file_name_original}: Removed after 6 months"
             db.session.commit()  # Commit the changes
@@ -472,12 +479,12 @@ class Job(db.Model):
         except Exception as e:
             print(f"Error downloading CSV: {e}")
             return {"status": "error", "message": f"Error downloading CSV: {e}"}
-      
-    """
-        Save file to the uploads folder while printing for temporary storage. 
-    """         
-    def saveToFolder(self):
+               
+    def saveToFolder(self, session):
+        print("in save to folder")
+        session.refresh(self)
         file_data = self.getFile()
+
         decompressed_data = gzip.decompress(file_data)
         with open(self.generatePath(), 'wb') as f:
             f.write(decompressed_data)
@@ -488,13 +495,81 @@ class Job(db.Model):
     def generatePath(self):
         return os.path.join('../uploads', self.getFileNamePk())
 
-    """
-        TIME-RELATED CODE BELOW 
-    """
+    # getters
+    def getName(self):
+        return self.name
+
+    def getFilePath(self):
+        return self.path
+
+    def getFile(self):
+        return self.file.file if self.file else None
     
-    """
-        Enter .gcode file and locate the model's time estimate. This will be the basis of the clocks and ETA on the frontend. 
-    """
+    def getStatus(self):
+        return self.status
+
+    def getFileNamePk(self):
+        return self.file_name_pk
+
+    def getFileNameOriginal(self):
+        return self.file_name_original
+    
+    def getFileFavorite(self):
+        return self.favorite
+    
+    def setFileFavorite(self, favorite):
+        self.favorite = favorite
+        db.session.commit()
+        return {"success": True, "message": "Favorite status updated successfully."}
+    
+    def getPrinterId(self): 
+        return self.printer_id
+
+    def getJobId(self):
+        return self.id
+
+    def getFilePause(self):
+        return self.filePause
+
+    def setFilePause(self, pause):
+        self.filePause = pause
+        current_app.socketio.emit('file_pause_update', {
+                                  'job_id': self.id, 'file_pause': self.filePause})
+    
+    def getExtruded(self):
+        return self.extruded
+    
+    def setExtruded(self, extruded):
+        self.extruded = extruded
+        current_app.socketio.emit('extruded_update', {
+                                    'job_id': self.id, 'extruded': self.extruded}) 
+
+    # setters
+
+    def setStatus(self, status):
+        self.status = status
+        # self.setDBstatus(self.id, status)
+
+    # added a setProgress method to update the progress of a job
+    # which sends it to the frontend using socketio
+    def setProgress(self, progress):
+        if self.status == 'printing':
+            self.progress = progress
+            # Emit a 'progress_update' event with the new progress
+            current_app.socketio.emit(
+                'progress_update', {'job_id': self.id, 'progress': self.progress})
+
+    # added a getProgress method to get the progress of a job
+    def getProgress(self):
+        return self.progress
+    
+    def setSentLines(self, sent_lines):
+        self.sent_lines = sent_lines
+        current_app.socketio.emit('gcode_viewer', {'job_id': self.id, 'gcode_num': self.sent_lines})
+        
+    def getSentLines(self):
+        return self.sent_lines
+
     def getTimeFromFile(self, comment_lines):
         # job_line can look two ways:
         # 1. ;TIME:seconds
