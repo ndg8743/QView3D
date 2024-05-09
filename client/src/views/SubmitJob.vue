@@ -229,8 +229,8 @@ const handleSubmit = async () => {
     } else {
         toast.error('Failed to add job to queue. Unexpected response.')
     }
-    setTimeout(() => {
-        router.go(0)}, 500);
+    // setTimeout(() => {
+    //     router.go(0)}, 500);
 
     isLoading.value = false
     isAsteriksVisible.value = true

@@ -450,6 +450,7 @@ class Printer(db.Model):
                 comment_lines = [line for line in lines if line.strip() and line.startswith(";")] # Retrieves all lines in file that are not empty and start with ";"
 
                 # Get the max layer height from the comments to display on frontebd 
+                max_layer_height = 0
                 for i in reversed(range(len(comment_lines))):
                     if ";LAYER_CHANGE" in comment_lines[i]:
                         if i < len(comment_lines) - 1:
@@ -458,7 +459,8 @@ class Printer(db.Model):
                             if match:
                                 max_layer_height = float(match.group(1))
                                 break
-                job.setMaxLayerHeight(max_layer_height)
+                if max_layer_height != 0:
+                    job.setMaxLayerHeight(max_layer_height)
                 
                 # Get the total time from the comments to display on frontend
                 total_time = job.getTimeFromFile(comment_lines)
