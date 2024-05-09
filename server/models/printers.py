@@ -192,8 +192,8 @@ class Printer(db.Model):
             }
 
 
-            # if (("original" in port.description.lower()) or ("prusa" in port.description.lower())) and (Printer.getPrinterByHwid(hwid_without_location) is None) : # filtering out non-3D printers
-            printerList.append(port_info)
+            if (("original" in port.description.lower()) or ("prusa" in port.description.lower())) and (Printer.getPrinterByHwid(hwid_without_location) is None) : # filtering out non-3D printers
+                printerList.append(port_info)
 
         return printerList
 
