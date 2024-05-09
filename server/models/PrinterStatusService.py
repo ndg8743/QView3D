@@ -52,22 +52,21 @@ class PrinterStatusService:
             ) 
             self.printer_threads.append(printer_thread)
             
-    def queue_restore(self, printers_data, new_queue):
-        print("here")
-        for printer_info in printers_data:
-            printer = Printer(
-                id=printer_info["id"],
-                device=printer_info["device"],
-                description=printer_info["description"],
-                hwid=printer_info["hwid"],
-                name=printer_info["name"],
+    # def queue_restore(self, printers_data, new_queue):
+    #     for printer_info in printers_data:
+    #         printer = Printer(
+    #             id=printer_info["id"],
+    #             device=printer_info["device"],
+    #             description=printer_info["description"],
+    #             hwid=printer_info["hwid"],
+    #             name=printer_info["name"],
                 
-            )
-            printer.queue = new_queue
-            printer_thread = self.start_printer_thread(
-                printer
-            ) 
-            self.printer_threads.append(printer_thread)
+    #         )
+    #         printer.queue = new_queue
+    #         printer_thread = self.start_printer_thread(
+    #             printer
+    #         ) 
+    #         self.printer_threads.append(printer_thread)
 
 
     """

@@ -795,8 +795,6 @@ class Printer(db.Model):
     """
     def setStatus(self, newStatus):
         try:
-            if((self.status == "error" and newStatus!="error")): 
-                Printer.hardReset(self.id)
             self.status = newStatus
             current_app.socketio.emit(
                 "status_update", {"printer_id": self.id, "status": newStatus}

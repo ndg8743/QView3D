@@ -31,16 +31,16 @@ def hardreset():
         print(f"Unexpected error: {e}")
         return jsonify({"error": "Unexpected error occurred"}), 500
     
-@status_bp.route('/hardresetqueue', methods=["POST"])
-def hardresetQueue():
-    try: 
-        data = request.get_json() 
-        id = data['printerid']
-        res = printer_status_service.resetThread(printer_id=id, restore=1)
-        return res 
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return jsonify({"error": "Unexpected error occurred"}), 500
+# @status_bp.route('/hardresetqueue', methods=["POST"])
+# def hardresetQueue():
+#     try: 
+#         data = request.get_json() 
+#         id = data['printerid']
+#         res = printer_status_service.resetThread(printer_id=id, restore=1)
+#         return res 
+#     except Exception as e:
+#         print(f"Unexpected error: {e}")
+#         return jsonify({"error": "Unexpected error occurred"}), 500
     
 """
     Deletes printer thread. This is used when the user deregisters a printer. 
