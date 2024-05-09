@@ -29,8 +29,6 @@ let isSubmitDisabled = false;
 const isGcodeImageVisible = ref(false)
 const isImageVisible = ref(true)
 
-const filamentTypes = ['PLA', 'PETG', 'ABS', 'ASA', 'FLEX', 'HIPS', 'EDGE', 'NGEN', 'PA', 'PVA', 'PCTG', 'PP', 'PC', 'CPE', 'PEBA', 'PVB', 'PLA TOUGH', 'METAL', 'PET']
-
 // fills printers array with printers that have threads from the database
 onMounted(async () => {
     try {
@@ -278,12 +276,6 @@ const triggerFileInput = () => {
     const fileInput = document.getElementById('file') as HTMLInputElement;
     fileInput.click();
 }
-
-// sets the filament type
-const selectFilament = (type: string) => {
-    filament.value = type
-}
-
 // gets the filament type from the gcode file
 // reads the file backwards and looks for the filament type
 // works for prusa slicer gcode files
@@ -428,28 +420,7 @@ const getFilament = (file: File) => {
                     </div>
 
                     <div class="mb-3">
-                        <label for="filament" class="form-label">Filament</label>
-                        <div class="tooltip">
-                            <span v-if="isAsteriksVisible" class="text-danger">*</span>
-                            <span class="tooltiptext">The filament needs to be selected if not prefilled.</span>
-                        </div>
-                        <div class="input-group">
-                            <div class="dropdown w-100" id="filamentDropdown">
-
-
-                                <button class="btn btn-primary dropdown-toggle w-100" type="button"
-                                    id="dropdownMenuButton" data-bs-toggle="dropdown"
-                                    :aria-expanded="filament ? 'false' : 'true'">
-                                    {{ filament || 'Select Filament' }}
-                                </button>
-
-                                <ul class="dropdown-menu dropdown-menu-scrollable w-100"
-                                    aria-labelledby="dropdownMenuButton">
-                                    <li><a class="dropdown-item" v-for="type in filamentTypes" :key="type"
-                                            @click="selectFilament(type)">{{ type }}</a></li>
-                                </ul>
-                            </div>
-                        </div>
+                        <label for="filament" class="form-label">Filament: <b>{{ filament || 'No filament detected' }}</b></label>
                     </div>
 
                     <div class="mb-3">
