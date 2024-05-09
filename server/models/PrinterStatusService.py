@@ -51,6 +51,23 @@ class PrinterStatusService:
                 printer
             ) 
             self.printer_threads.append(printer_thread)
+            
+    def queue_restore(self, printers_data, new_queue):
+        print("here")
+        for printer_info in printers_data:
+            printer = Printer(
+                id=printer_info["id"],
+                device=printer_info["device"],
+                description=printer_info["description"],
+                hwid=printer_info["hwid"],
+                name=printer_info["name"],
+                
+            )
+            printer.queue = new_queue
+            printer_thread = self.start_printer_thread(
+                printer
+            ) 
+            self.printer_threads.append(printer_thread)
 
 
     """
@@ -82,7 +99,7 @@ class PrinterStatusService:
         Sets a variable called "terminated" to 1. If the thread is "stuck" in its target function, it detects this 
         terminated flag and returns. 
     """
-    def resetThread(self, printer_id):
+    def resetThread(self, printer_id, restore=0):
         try: 
             for thread in self.printer_threads:
                 if thread.printer.id == printer_id:    
@@ -96,7 +113,10 @@ class PrinterStatusService:
                         "name": printer.name, 
                     }
                     self.printer_threads.remove(thread)
-                    self.create_printer_threads([thread_data])
+                    if(restore==1):
+                        self.queue_restore([thread_data], printer.queue)
+                    else: 
+                        self.create_printer_threads([thread_data])
                     break
             return jsonify({"success": True, "message": "Printer thread reset successfully"})
         except Exception as e:
