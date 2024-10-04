@@ -37,6 +37,7 @@ QView3D, developed at SUNY's Hydra Lab, is an open-source software project desig
 
 ![QView3D Diagram](QView3D-Architecture%20Diagram.jpg)
 
+
 ## Setup and Installation
 
 The software is currently designed to run on Ubuntu 20.04 LTS and later. MacOS and Windows are not fully supported but can be achieved with additional configuration.
