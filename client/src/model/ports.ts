@@ -1,17 +1,15 @@
-import { useRouter } from 'vue-router'
-import { ref, computed, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import * as myFetch from './myFetch'
 import { toast } from './toast'
 import { type Job } from './jobs'
-import { socket } from './myFetch'
 
 export function api(action: string, body?: unknown, method?: string, headers?: any) {
   headers = headers ?? {}
-  return myFetch.api(`${action}`, body, method, headers).catch((err) => console.log(err))
+  return myFetch.api(`${action}`, body, method, headers).catch((err) => console.error(err))
 }
 
 export interface Device {
-  device: string
+  device: Record<string, any>
   description: string
   hwid: string
   name?: string
@@ -26,26 +24,22 @@ export interface Device {
   extruder_temp?: number
   bed_temp?: number
   colorChangeBuffer?: number
+  colorbuff?: number,
+  consoles?: [string[], string[], string[], string[], string[]] // array of debug, info, warning, error and critical console messages
+  gcodeLines?: string[] // array of gocde lines sent to the printer
 }
 
-export let printers = ref<Device[]>([])
+export const printers = ref<Device[]>([])
 
-export function useGetPorts() {
-  return {
-    async ports() {
+export async function getPorts() {
       try {
-        const response = await api('getports')
-        return response
+        return await api('getports')
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useRegisterPrinter() {
-  return {
-    async register(printer: Device) {
+export async function registerPrinter(printer: Device) {
       try {
         const response = await api('register', { printer })
         if (response) {
@@ -65,53 +59,34 @@ export function useRegisterPrinter() {
         console.error(error)
         toast.error('An error occurred while registering the printer')
       }
-    }
-  }
 }
 
-export function useRetrievePrinters() {
-  return {
-    async retrieve() {
+export async function useRetrievePrinters() {
       try {
-        const response = await api('getprinters')
-        return response.printers
+        return await api('getprinterinfo')
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
 // gets the printers that have threads information from the server
-export function useRetrievePrintersInfo() {
-  return {
-    async retrieveInfo() {
+export async function retrievePrintersInfo() {
       try {
-        const response = await api('getprinterinfo')
-        return response // return the response directly
+        return await api('getprinterinfo')
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useSetStatus() {
-  return {
-    async setStatus(printerid: number | undefined, status: string) {
+export async function setStatus(printerid: number | undefined, status: string) {
       try {
-        const response = await api('setstatus', { printerid, status })
-        return response
+        return await api('setstatus', { printerid, status })
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useHardReset() {
-  return {
-    async hardReset(printerid: number | undefined) {
+export async function hardReset(printerid: number | undefined) {
       try {
         const response = await api('hardreset', { printerid })
         if (response) {
@@ -131,13 +106,9 @@ export function useHardReset() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useNullifyJobs() {
-  return {
-    async nullifyJobs(printerid: number | undefined) {
+export async function nullifyJobs(printerid: number | undefined) {
       try {
         const response = await api('nullifyjobs', { printerid })
         if (response) {
@@ -157,39 +128,17 @@ export function useNullifyJobs() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useDeletePrinter() {
-  return {
-    async deletePrinter(printerid: number | undefined) {
+export async function deletePrinter(fabricator_id: number | undefined) {
       try {
-        const response = await api('deleteprinter', { printerid })
-        // if (response) {
-        //   if (response.success == false) {
-        //     toast.error(response.message)
-        //   } else if (response.success === true) {
-        //     toast.success(response.message)
-        //   } else {
-        //     console.error('Unexpected response:', response)
-        //     toast.error('Failed to delete printer. Unexpected response.')
-        //   }
-        // } else {
-        //   console.error('Response is undefined or null')
-        //   toast.error('Failed to delete printer. Unexpected response')
-        // }
-        return response
+        return await api('deletefabricator', { fabricator_id })
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useRemoveThread() {
-  return {
-    async removeThread(printerid: number | undefined) {
+export async function removeThread(printerid: number | undefined) {
       try {
         const response = await api('removethread', { printerid })
         if (response) {
@@ -209,15 +158,11 @@ export function useRemoveThread() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useEditName() {
-  return {
-    async editName(printerid: number | undefined, name: string) {
+export async function editName(fabricator_id: number | undefined, name: string) {
       try {
-        const response = await api('editname', { printerid, name })
+        const response = await api('editname', { fabricator_id, name })
         if (response) {
           if (response.success == false) {
             toast.error(response.message)
@@ -235,26 +180,17 @@ export function useEditName() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useEditThread() {
-  return {
-    async editThread(printerid: number | undefined, newname: string) {
+export async function editThread(fabricator_id: number | undefined, newname: string) {
       try {
-        const response = await api('editNameInThread', { printerid, newname })
-        return response
+        return await api('editNameInThread', { fabricator_id, newname })
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useDiagnosePrinter() {
-  return {
-    async diagnose(device: string) {
+export async function diagnosePrinter(device: string) {
       try {
         const response = await api('diagnose', { device })
         if (response) {
@@ -274,13 +210,9 @@ export function useDiagnosePrinter() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useRepair() {
-  return {
-    async repair() {
+export async function repair() {
       try {
         const response = await api('repairports')
         if (response) {
@@ -300,13 +232,9 @@ export function useRepair() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useMoveHead() {
-  return {
-    async move(port: string) {
+export async function moveHead(port: string) {
       try {
         const response = await api('movehead', { port })
         if (response) {
@@ -326,21 +254,14 @@ export function useMoveHead() {
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }
 
-export function useMovePrinterList() {
-  return {
-    async movePrinterList(printers: Device[]) {
+export async function movePrinterList(printers: Device[]) {
       try {
         // make new array of printer id's in the order they are in the printers array
         const printersIds = printers.map((printer) => printer.id)
-        const response = await api('moveprinterlist', { printersIds })
-        return response
+        return await api('moveprinterlist', { printersIds })
       } catch (error) {
         console.error(error)
       }
-    }
-  }
 }

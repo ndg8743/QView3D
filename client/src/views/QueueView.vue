@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onUnmounted, ref, computed, watchEffect, onMounted, watch } from 'vue'
 import { printers, type Device } from '../model/ports'
-import { useRerunJob, useRemoveJob, type Job, useMoveJob, useGetFile, useGetJobFile, isLoading } from '../model/jobs'
+import { useRerunJob, useRemoveJob, type Job, useMoveJob, useGetFile, useGetJobFile} from '../model/jobs'
 import draggable from 'vuedraggable'
 import { toast } from '@/model/toast'
-import { useRouter } from 'vue-router'
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue'
 import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
-
+import NoPrinterRobot from '@/components/NoPrinterRobot.vue'
+const isLoading = ref(false)
 const { removeJob } = useRemoveJob()
 const { rerunJob } = useRerunJob()
 const { moveJob } = useMoveJob()
@@ -42,6 +42,28 @@ onMounted(() => {
     isImageVisible.value = true
   });
   isLoading.value = false
+
+  // Event listeners for the accordion collapse
+  const accordionItems = document.querySelectorAll('.accordion-collapse');
+  accordionItems.forEach(item => {
+    item.addEventListener('show.bs.collapse', () => {
+      const printerId = item.getAttribute('data-printer-id');
+      const printer = printers.value.find(p => p.id === Number(printerId));
+
+      if (printer) {
+        printer.isQueueExpanded = true;
+      }
+    });
+
+    item.addEventListener('hide.bs.collapse', () => {
+      const printerId = item.getAttribute('data-printer-id');
+      const printer = printers.value.find(p => p.id === Number(printerId));
+
+      if (printer) {
+        printer.isQueueExpanded = false;
+      }
+    });
+  });
 });
 
 
@@ -212,12 +234,9 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
       </div>
     </div>
 
-    <div v-if="printers.length === 0">
-      No printers available. Either register a printer
-      <RouterLink class="routerLink" to="/registration"> here </RouterLink>, or restart the server.
-    </div>
+    <NoPrinterRobot/>
 
-    <div v-else class="accordion" id="accordionPanelsStayOpenExample">
+    <div v-if="printers.length > 0" class="accordion" id="accordionPanelsStayOpenExample">
       <div class="accordion-item" v-for="(printer, index) in printers" :key="printer.id">
         <h2 class="accordion-header" :id="'panelsStayOpen-heading' + index">
           <button class="accordion-button" type="button" data-bs-toggle="collapse"
@@ -240,13 +259,12 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
           </button>
         </h2>
         <div :id="'panelsStayOpen-collapse' + index" class="accordion-collapse collapse"
-          :class="{ show: printer.isQueueExpanded }" :aria-labelledby="'panelsStayOpen-heading' + index"
-          @show.bs.collapse="printer.isQueueExpanded = !printer.isQueueExpanded">
+          :class="{ show: printer.isQueueExpanded }" :aria-labelledby="'panelsStayOpen-heading' + index">
           <div class="accordion-body">
             <div :class="{ 'scrollable': printer.queue!.length > 3 }">
               <table class="table-striped">
                 <thead>
-                  <tr style="position: sticky; top: 0; z-index: 100; background-color: white;">
+                  <tr style="position: sticky; top: 0; z-index: 100;">
                     <th style="width: 102px;">Ticket ID</th>
                     <th style="width: 143px;">Rerun Job</th>
                     <th style="width: 76px;">Position</th>
@@ -299,11 +317,11 @@ const openModal = async (job: Job, printerName: string, num: number, printer: De
                       <td class="truncate" :title="job.file_name_original">{{ job.file_name_original }}</td>
                       <td class="truncate" :title="job.date">{{ job.date }}</td>
                       <td class="truncate" :title="job.status"
-                        v-if="printer.queue && printer.status == 'printing' && printer.queue?.[0].released == 0 && job.status == 'printing'">
+                        v-if="printer.status == 'ready' && printer.queue?.[0].released == 0 && job.status == 'ready'">
                         pending release</td>
                       <td v-else>{{ job.status }}</td>
 
-                      <td style="width:">
+                      <td style="">
                         <div class="dropdown">
                           <div style="
                             display: flex;

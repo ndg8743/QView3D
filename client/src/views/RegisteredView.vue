@@ -1,23 +1,10 @@
 <script setup lang="ts">
-import { printers, useGetPorts, useRetrievePrintersInfo, useHardReset, useDeletePrinter, useNullifyJobs, useEditName, useRemoveThread, useEditThread, useDiagnosePrinter, useRepair, type Device, useRetrievePrinters, useMoveHead } from '../model/ports'
-import { isLoading } from '../model/jobs'
-import { useRouter } from 'vue-router'
+import { printers, retrievePrintersInfo, hardReset, deletePrinter, nullifyJobs, editName, removeThread, editThread, diagnosePrinter, repair, type Device, useRetrievePrinters, moveHead } from '@/model/ports'
 import { ref, onMounted } from 'vue';
-import { toast } from '../model/toast'
-import RegisterModal from '../components/RegisterModal.vue'
+import { toast } from '@/model/toast'
+import RegisterModal from '@/components/RegisterModal.vue'
 import router from '@/router';
-
-const { retrieve } = useRetrievePrinters();
-const { retrieveInfo } = useRetrievePrintersInfo();
-const { hardReset } = useHardReset();
-const { deletePrinter } = useDeletePrinter();
-const { nullifyJobs } = useNullifyJobs();
-const { editName } = useEditName();
-const { removeThread } = useRemoveThread();
-const { editThread } = useEditThread();
-const { diagnose } = useDiagnosePrinter();
-const { repair } = useRepair();
-const { move } = useMoveHead();
+import { watch } from 'fs';
 
 const registered = ref<Array<Device>>([]) // Stores array of printers already registered in the system
 const editMode = ref(false)
@@ -32,22 +19,22 @@ const modalMessage = ref('');
 const modalAction = ref('');
 const selectedPrinter = ref<Device | null>(null);
 
+const isLoading = ref(false)
+
 // fetch list of connected ports from backend and automatically load them into the form dropdown 
 onMounted(async () => {
     isLoading.value = true
-    const allPrinters = await retrieve(); // load all registered printers
-    registered.value = allPrinters
+    registered.value = await useRetrievePrinters(); // load all registered printers
     isLoading.value = false
 });
 
-const doHardReset = async (printer: Device) => {
+const doHardReset = async (printer: Device | null) => {
     isLoading.value = true
-    await hardReset(printer.id).then(() => {
-        router.go(0)
+    hardReset(printer?.id).then(() => {
+        isLoading.value = false
     }).catch(() => {
         toast.error('Failed to reset printer')
     })
-    isLoading.value = false
 }
 
 const doDelete = async (printer: Device) => {
@@ -83,8 +70,8 @@ const doDelete = async (printer: Device) => {
         toast.error('Failed to delete printer. Unexpected response')
     }
 
-    printers.value = await retrieveInfo();
-    registered.value = await retrieve();
+    printers.value = await retrievePrintersInfo();
+    registered.value = await useRetrievePrinters();
     isLoading.value = false
     // await removeThread(printer.id)
 }
@@ -95,7 +82,7 @@ const saveName = async (printer: Device) => {
     await editName(printer.id, newName.value.trim())
     printer.name = newName.value.trim();
 
-    printers.value = await retrieveInfo();
+    printers.value = await retrievePrintersInfo();
     isLoading.value = false
 
     editMode.value = false
@@ -113,9 +100,9 @@ const doRepair = async () => {
     isLoading.value = false
 }
 
-const doMove = async (printer: Device) => {
+const doMove = async (port: string) => {
     isLoading.value = true
-    await move(printer.device).then(() => {
+    await moveHead(port).then(() => {
         toast.success('Printer moved to home position')
     }).catch(() => {
         toast.error('Failed to move printer to home position')
@@ -125,9 +112,9 @@ const doMove = async (printer: Device) => {
 
 const doDiagnose = async (printer: Device) => {
     isLoading.value = true
-    message.value = `Diagnosing <b>${printer.name}</b>:<br/><br/>This printer is registered under port <b>${printer.device}</b>.`
+    message.value = `Diagnosing <b>${printer.name}</b>:<br/><br/>This printer is registered under port <b>${printer.device['serialPort']}</b>.`
     showMessage.value = true
-    let str = await diagnose(printer.device)
+    let str = await diagnosePrinter(printer.device['serialPort'])
     let resstr = str.diagnoseString
     message.value += "<br><br>" + resstr
     isLoading.value = false
@@ -156,7 +143,7 @@ const toggleMessage = (printer: Device) => {
 }
 
 const doCloseRegisterModal = async () => {
-    registered.value = await retrieve();
+    registered.value = await useRetrievePrinters();
 }
 
 </script>
@@ -175,8 +162,8 @@ const doCloseRegisterModal = async () => {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button v-if="modalAction === 'doHardReset'" type="button" class="btn btn-danger"
-                        data-bs-dismiss="modal" @click="doHardReset(selectedPrinter!)">Reset</button>
-                    <button v-if="modalAction === 'doDelete'" type="button" class="btn btn-danger"
+                        data-bs-dismiss="modal" @click="doHardReset(selectedPrinter)">Reset</button>
+                    <button v-if="modalAction === 'doDelete'" type="button" class="btn btn-primary"
                         data-bs-dismiss="modal" @click="doDelete(selectedPrinter!)">Deregister</button>
                 </div>
             </div>
@@ -210,7 +197,7 @@ const doCloseRegisterModal = async () => {
                                                 <span class="ms-2">Edit Name</span>
                                             </a>
                                         </li>
-                                        <div class="tooltip" style="width: 100%;">
+                                        <div class="tooltip-modal" style="width: 100%;">
                                             <li>
                                                 <a class="dropdown-item d-flex align-items-center"
                                                     style="font-size: 1rem;" data-bs-toggle="modal"
@@ -239,7 +226,7 @@ const doCloseRegisterModal = async () => {
                                             </a>
                                         </li>
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center" @click="doMove(printer)">
+                                            <a class="dropdown-item d-flex align-items-center" @click="doMove(printer.device['serialPort'])">
                                                 <i class="fas fa-home"></i>
                                                 <span class="ms-2">Home Printer</span>
                                             </a>
@@ -249,20 +236,20 @@ const doCloseRegisterModal = async () => {
                             </div>
                             <div v-if="editMode && (editNum == printer.id)" class="d-flex align-items-center"
                                 style="margin-bottom: 5px;">
-                                <input id="editName" type="text" class="form-control me-2" v-model="newName">
+                                <input id="editName" type="text" class="form-control me-2" v-model="newName" @keydown.enter="saveName(printer)">
                                 <button class="btn btn-success me-2" @click="saveName(printer)">Save</button>
                                 <button class="btn btn-secondary"
                                     @click="editMode = false; editNum = undefined; newName = ''">Cancel</button>
                             </div>
                         </div>
-                        <h6 class="card-text mb-0"> <b>Printer device:</b> {{ printer.device }}</h6>
+                        <h6 class="card-text mb-0"> <b>Printer device:</b> {{ printer.name }}</h6>
                         <h6 class="card-text mb-0"> <b>Printer description:</b> {{ printer.description }}</h6>
                         <h6 class="card-text mb-0"> <b>Date registered:</b> {{ printer.date }}</h6>
                         <h6 class="card-text mt-0"> <b>HWID:</b> {{ printer.hwid }}</h6>
 
                         <div v-if="messageId == printer.id && showMessage"
-                            class="alert alert-danger d-flex flex-column align-items-center justify-content-center">
-                            <h6 v-html="message"></h6>
+                            class="alert alert-light d-flex flex-column align-items-center justify-content-center" style="overflow: auto; word-wrap: break-word;">
+                            <p v-html="message" style="width: 100%; word-break: break-word"></p>
                             <div class="d-flex justify-content-between">
                                 <button class="btn btn-secondary me-3" @click="clearMessage()">Clear</button>
                                 <button class="btn btn-primary w-100" @click="doRepair()">Repair Ports</button>
@@ -304,10 +291,7 @@ const doCloseRegisterModal = async () => {
     border: 1px solid var(--color-border);
 }
 
-.modal-dialog {
-    max-width: 500px;
-    /* Adjust modal width */
-}
+
 
 .card-body {
     color: var(--color-background-font);

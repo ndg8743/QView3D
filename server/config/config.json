@@ -1,4 +1,12 @@
 {
     "environment": "development",
-    "databaseURI": "hvamc"
+    "databaseURI": "hvamc",
+    "emulator_port": 8001,
+    "discord": {
+        "enabled": false,
+        "token": "<token>",
+        "command_prefix": "!",
+        "issues_channel": "<issues_channel>",
+        "issues_role": "<issues_role>"
+    }
 }

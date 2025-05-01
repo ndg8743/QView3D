@@ -4,74 +4,42 @@ import '@cyhnkckali/vue3-color-picker/dist/style.css'
 import "@/assets/main.css"
 import { RouterView } from 'vue-router'
 import NavBar from '@/components/NavBar.vue'
-import ThemePanel from '@/components/ThemePanel.vue'
-import SettingsPanel from '@/components/SettingsPanel.vue'
-import { onMounted } from 'vue';
-import {
-    setupPortRepairSocket,
-    setupErrorSocket,
-    setupJobStatusSocket,
-    setupPauseFeedbackSocket,
-    setupProgressSocket,
-    setupQueueSocket,
-    setupReleaseSocket,
-    setupStatusSocket,
-    setupTempSocket,
-    setupGCodeViewerSocket,
-    setupExtrusionSocket,
-    setupCurrentLayerHeightSocket,
-    setupMaxLayerHeightSocket
-} from '@/model/sockets';
-import {useRetrievePrintersInfo, printers} from '@/model/ports';
-import {setupTimeSocket, isLoading} from '@/model/jobs';
+import { onMounted, ref} from 'vue';
+import {setupSockets} from '@/model/sockets';
+import {retrievePrintersInfo, printers} from '@/model/ports';
+import {setupTimeSocket} from '@/model/jobs';
+import FooterComponent from './components/FooterComponent.vue'
+import {watch} from 'vue';
+import IsLoading from './components/IsLoading.vue'
 
-const { retrieveInfo } = useRetrievePrintersInfo();
+const isLoading = ref(false)
 
 onMounted(async () => {
-    printers.value = await retrieveInfo()
+  printers.value = await retrievePrintersInfo()
 
-    // sockets
-    setupStatusSocket(printers)
-    setupQueueSocket(printers)
-    setupProgressSocket(printers)
-    setupJobStatusSocket(printers)
-    setupErrorSocket(printers)
-    setupTimeSocket(printers)
-    setupTempSocket(printers)
-    setupGCodeViewerSocket(printers)
-    setupPauseFeedbackSocket(printers) //not sure if needed
-    setupReleaseSocket(printers)
-    setupPortRepairSocket(printers)
-    setupExtrusionSocket(printers)
-    setupMaxLayerHeightSocket(printers)
-    setupCurrentLayerHeightSocket(printers)
+  // sockets
+  setupSockets(printers.value)
+  setupTimeSocket(printers.value)
+})
+
+// For updating the frontend when information on the printer changes
+watch(printers, (updatedPrinter) => {
+  if (updatedPrinter) {
+    setupSockets(printers.value)
+    setupTimeSocket(printers.value)
+  }
 })
 </script>
 
 <template>
-    <transition name="fade">
-        <div v-if="isLoading" class="modal fade show d-block" id="loadingModal" tabindex="-1"
-             aria-labelledby="loadingModalLabel" aria-hidden="true"
-             style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; overflow-y: hidden;">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-body d-flex justify-content-center align-items-center"
-                     style="user-select: none; position: relative;">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </transition>
-
+    <IsLoading v-if="isLoading" />
     <nav style="padding-bottom: 2.5rem;">
         <NavBar/>
     </nav>
     <div class="">
         <RouterView/>
     </div>
-    <ThemePanel/>
-    <SettingsPanel/>
+    <FooterComponent/>
 </template>
 
 <style scoped></style>

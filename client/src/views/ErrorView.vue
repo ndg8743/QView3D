@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { printers, type Device } from '../model/ports'
-import { type Issue, useGetIssues, useCreateIssues, useAssignIssue, useDeleteIssue, useEditIssue } from '../model/issues'
-import { pageSize, useGetJobs, type Job, useAssignComment, useGetJobFile, useGetFile, useRemoveIssue, useDownloadCsv, isLoading } from '../model/jobs';
+import { printers, type Device } from '@/model/ports'
+import {
+  type Issue,
+  useGetIssues,
+  useCreateIssues,
+  useAssignIssue,
+  useDeleteIssue,
+  useEditIssue,
+  useGetIssueByJob
+} from '@/model/issues'
+import { pageSize, useGetJobs, type Job, useAssignComment, useGetJobFile, useGetFile, useGetLogFile, useRemoveIssue, useDownloadCsv} from '@/model/jobs';
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
 import { useRouter } from 'vue-router';
 import GCode3DImageViewer from '@/components/GCode3DImageViewer.vue'
@@ -9,12 +17,15 @@ import GCodeThumbnail from '@/components/GCodeThumbnail.vue';
 import VueDatePicker from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 
+const isLoading = ref(false)
 const { jobhistory, getFavoriteJobs } = useGetJobs()
 const { issues } = useGetIssues()
+const { issue } = useGetIssueByJob()
 const { createIssue } = useCreateIssues()
 const { assign } = useAssignIssue()
 const { assignComment } = useAssignComment()
 const { getFileDownload } = useGetJobFile()
+const { getLogFile } = useGetLogFile()
 const { getFile } = useGetFile()
 const { deleteIssue } = useDeleteIssue()
 const { removeIssue } = useRemoveIssue()
@@ -74,6 +85,8 @@ let searchCriteria = ref('');
 const isOnlyJobNameChecked = computed(() => searchByJobName.value && !searchByFileName.value);
 const isOnlyFileNameChecked = computed(() => !searchByJobName.value && searchByFileName.value);
 
+const charLimit = 500;
+
 // computed property that returns the filtered list of jobs. 
 let filteredJobs = computed(() => {
     if (filter.value) {
@@ -87,21 +100,21 @@ onMounted(async () => {
     try {
         isLoading.value = true;
 
-        const retrieveissues = await issues();
-        issuelist.value = retrieveissues;
+        issuelist.value = await issues();
 
         const printerIds = selectedPrinters.value.map(p => p).filter(id => id !== undefined) as number[];
 
         // Fetch jobs into `fetchedJobs` and total into `totalJobs`
         [fetchedJobs.value, totalJobs.value] = await jobhistory(page.value, pageSize.value, printerIds, 1);
+        for (let i = 0; i < fetchedJobs.value.length; i++) {
+            fetchedJobs.value[i].error = await issue(fetchedJobs.value[i].id)
+        }
 
         // Update `displayJobs` with the fetched jobs
         displayJobs.value = fetchedJobs.value;
 
         totalPages.value = Math.ceil(totalJobs.value / pageSize.value);
         totalPages.value = Math.max(totalPages.value, 1);
-
-        console.log(displayJobs.value);
 
         document.addEventListener('click', closeDropdown);
 
@@ -238,9 +251,8 @@ const ensureOneCheckboxChecked = () => {
 
 const doCreateIssue = async () => {
     isLoading.value = true
-    await createIssue(newIssue.value)
-    const newIssues = await issues()
-    issuelist.value = newIssues
+    await createIssue(newIssue.value.slice(0, charLimit))
+    issuelist.value = await issues()
     resetIssueValues()
     isLoading.value = false
 }
@@ -249,8 +261,7 @@ const doDeleteIssue = async (issue: Issue) => {
     isLoading.value = true
     if (issue === undefined) return
     await deleteIssue(issue)
-    const newIssues = await issues()
-    issuelist.value = newIssues
+    issuelist.value = await issues()
     submitFilter()
     resetIssueValues()
     isLoading.value = false
@@ -381,7 +392,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    Thi CSV file will only contain jobs included in the current filtration criteria. Are you sure you
+                    This CSV file will only contain jobs included in the current filtration criteria. Are you sure you
                     want to download this CSV file?
                 </div>
                 <div class="modal-footer">
@@ -501,7 +512,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
                             <label for="issue" class="form-label">Select Issue</label>
                             <select name="issue" id="issue" v-model="selectedIssueId" class="form-select" required>
                                 <option disabled value="undefined">Select Issue</option>
-                                <option v-for="issue in issuelist" :value="issue.id">
+                                <option v-for="issue in issuelist" :key="issue.id" :value="issue.id">
                                     {{ issue.issue }}
                                 </option>
                                 <option disabled class="separator">----------------</option>
@@ -529,7 +540,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
         <div class="row w-100" style="margin-bottom: 0.5rem;">
             <div class="col-1 text-start" style="padding-left: 0">
                 <div style="position: relative;">
-                    <button type="button" class="btn btn-primary dropdown-toggle"
+                    <button v-if="!(issuelist.values)" type="button" class="btn btn-primary dropdown-toggle"
                         @click.stop="filterDropdown = !filterDropdown">
                         Filter
                     </button>
@@ -698,6 +709,9 @@ const onlyNumber = ($event: KeyboardEvent) => {
                     <td class="truncate" :title="job.error" v-if="job.error">
                         {{ job.error }}
                     </td>
+                    <td class="truncate" v-else>
+                        <span class="ttext-center">No issue</span>
+                    </td>
                     <td class="truncate" :title="job.date?.toString()">{{ job.date }}</td>
                     <td class="truncate" :title="job.comments">{{ job.comments }}</td>
                     <td>
@@ -727,7 +741,15 @@ const onlyNumber = ($event: KeyboardEvent) => {
                                             @click="getFileDownload(job.id)"
                                             :disabled="job.file_name_original.includes('.gcode:')">
                                             <i class="fas fa-download"></i>
-                                            <span class="ms-2">Download</span>
+                                            <span class="ms-2">Download Gcode</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center"
+                                            @click="getLogFile(job.id)"
+                                            :disabled="job.file_name_original.includes('.gcode:')">
+                                            <i class="fas fa-download"></i>
+                                            <span class="ms-2">Download Log</span>
                                         </a>
                                     </li>
                                     <li>
@@ -786,7 +808,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
 .sticky {
     position: sticky;
     bottom: 0;
-    background: var(--color-background-mute);
+    background: var(--color-background) !important;
     margin-right: -1rem;
     margin-left: -1rem;
 }
@@ -797,7 +819,7 @@ const onlyNumber = ($event: KeyboardEvent) => {
     /* Adjust this value to increase or decrease the gap */
     width: 400px;
     z-index: 1000;
-    background: var(--color-background-mute);
+    background: var(--color-background);
     border: 1px solid var(--color-border);
     padding-bottom: 0 !important;
 }
@@ -875,22 +897,6 @@ const onlyNumber = ($event: KeyboardEvent) => {
     border-radius: 5px;
 }
 
-.offcanvas {
-    width: 700px;
-}
-
-.offcanvas-btn-box {
-    transition: transform .3s ease-in-out;
-    position: fixed;
-    top: 50%;
-    right: 0;
-    z-index: 1041;
-}
-
-.offcanvas-end {
-    border-left: 0;
-}
-
 table {
     width: 100%;
     border-collapse: collapse;
@@ -920,6 +926,11 @@ label.form-check-label {
     color: var(--color-background-font);
     background-color: var(--color-background-mute) !important;
     border-color: var(--color-modal-background-light-inverted) !important;
+    margin-top: 1rem;
+}
+
+.form-check {
+    margin-top: 10px;
 }
 
 ::placeholder {

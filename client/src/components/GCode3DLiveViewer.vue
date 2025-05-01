@@ -1,132 +1,141 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onActivated, onDeactivated, ref, toRef, watchEffect, onUnmounted } from 'vue';
-import { useGetFile, type Job } from '@/model/jobs';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { type Device } from '@/model/ports';
 import * as GCodePreview from 'gcode-preview';
+import { withConsoleSuppression } from '@/model/gcodeWorker';
 
-const { getFile } = useGetFile();
+// this is because Ari is talking to the gcode-preview people about getting the whole thing moved to web threads. The code is complete for it to work with web threads on this end, but the package itself doesn't support it.
+const figuredOutWorkers = false;
 
-const props = defineProps({
-    job: Object as () => Job
-})
+const props = defineProps<{ device: Device }>();
 
-const job = toRef(props, 'job');
-
-const modal = document.getElementById('gcodeLiveViewModal');
-
-// Create a ref for the canvas
-const canvas = ref<HTMLCanvasElement | null>(null);
+const canvas = ref<HTMLCanvasElement | undefined>(undefined);
 let preview: GCodePreview.WebGLPreview | null = null;
-let layers: string[][] = [];
+let worker: Worker | null = null;
 
+// Initialize rendering logic on mount
 onMounted(async () => {
-    if (!modal) {
-        console.error('Modal element is not available');
-        return;
+  if (!canvas.value) {
+    console.error('Canvas not found');
+    return;
+  }
+
+  // Rendering settings
+  const settings = {
+    extrusionColor: getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#7561A9',
+    backgroundColor: 'black',
+    buildVolume: { x: 250, y: 210, z: 220 },
+    travelColor: 'limegreen',
+    lineWidth: 0.8,
+    lineHeight: 0.4,
+    extrusionWidth: 0.8,
+    renderExtrusion: true,
+    renderTravel: false,
+    renderTubes: false,
+    initialCameraPosition: [-200, 232, 200],
+  };
+
+  // Initialize worker or preview
+  if (figuredOutWorkers) {
+    const offscreen: OffscreenCanvas = canvas.value.transferControlToOffscreen();
+    worker = new Worker(new URL('@/model/gcodeWorker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (event) => {
+      const { type, error } = event.data;
+      if (type === 'error') console.error('Worker Error:', error);
+    };
+    worker.postMessage(
+      {
+        type: 'init',
+        payload: {
+          canvas: offscreen,
+          ...settings,
+        },
+      },
+      [offscreen]
+    );
+  } else {
+    if (preview) {
+      preview.clear();
     }
+    withConsoleSuppression(() => {
+      preview = GCodePreview.init({
+        canvas: canvas.value,
+        ...settings,
+      });
+    });
+  }
 
-    const gcodeFile = await getFile(props.job!);
-    if (!gcodeFile) {
-        console.error('Failed to get the file');
-        return;
+  // Function to render GCode lines
+  const renderGCode = (gcode: string) => {
+    if (figuredOutWorkers) {
+      worker?.postMessage({
+        type: 'render',
+        payload: { gcode },
+      });
+    } else if (preview) {
+      if (preview.renderTubes) withConsoleSuppression(() => preview!.processGCode(gcode));
+      else preview.processGCode(gcode);
     }
+  };
 
-    const fileString = await fileToString(gcodeFile);
-    const lines = fileString.split('\n');
-    layers = lines.reduce((layers, line) => {
-        if (line.startsWith(";LAYER_CHANGE")) {
-            layers.push([]);
-        }
-        if (layers.length > 0) {
-            layers[layers.length - 1].push(line as never);
-        }
-        return layers;
-    }, [[]]);
-
-    watchEffect(() => {
-        if (job.value?.current_layer_height && preview) {
-            try {
-                // process gcode of layers up to current_layer_height
-                const currentLayerIndex = layers.findIndex(layer => layer.includes(`;Z:${job.value!.current_layer_height}`));
-                if (currentLayerIndex !== -1) {
-                    preview.clear();
-                    preview.processGCode(layers.slice(0, currentLayerIndex + 1).flat());
-                }
-            } catch (error) {
-                console.error('Failed to process GCode:', error);
-            }
-        }
-    });
-
-    modal.addEventListener('shown.bs.modal', async () => {
-        // Initialize the GCodePreview and show the GCode when the modal is shown
-        if (canvas.value) {
-            preview = GCodePreview.init({
-                canvas: canvas.value,
-                extrusionColor: getComputedStyle(document.documentElement).getPropertyValue('--bs-primary-color').trim() || '#7561A9',
-                backgroundColor: 'black',
-                buildVolume: { x: 250, y: 210, z: 220 },
-            });
-
-            preview.camera.position.set(0, 475, 0);
-            preview.camera.lookAt(0, 0, 0);
-
-            if (job.value?.current_layer_height && preview) {
-                try {
-                    // process gcode of layers up to current_layer_height
-                    const currentLayerIndex = layers.findIndex(layer => layer.includes(`;Z:${job.value!.current_layer_height}`));
-                    if (currentLayerIndex !== -1) {
-                        preview.clear();
-                        const gcode = layers.slice(0, currentLayerIndex + 1).flat();
-                        preview.processGCode(gcode);
-                    }
-                } catch (error) {
-                    console.error('Failed to process GCode:', error);
-                }
-            }
-        }
-    });
-
-    modal.addEventListener('hidden.bs.modal', () => {
-        // Clean up when the modal is hidden
-        preview?.processGCode('');
+  // Watch for changes to GCode lines
+  watch(
+    () => props.device?.gcodeLines,
+    (newGCodeLines) => {
+      if (figuredOutWorkers) {
+        worker?.postMessage({ type: 'clear' });
+      } else {
         preview?.clear();
-        preview = null;
-    });
-});
+        preview?.render();
+        preview?.dispose();
+        withConsoleSuppression(() => {
+          preview = GCodePreview.init({
+            canvas: canvas.value,
+            ...settings,
+          });
+        })
+      }
+      if (!newGCodeLines || newGCodeLines.length === 0) {
+        // Clear existing render data
+        return
+      }
+      // Render all lines
+      newGCodeLines.forEach((line) => renderGCode(line));
+    },
+    { immediate: true }
+  );
 
-onUnmounted(() => {
-    preview?.processGCode('');
-    preview?.clear();
-    preview = null;
-});
-
-const fileToString = (file: File | undefined) => {
-    if (!file) {
-        console.error('File is not available');
-        return '';
+  // Watch for additional lines being added
+  watch(
+    () => props.device?.gcodeLines?.length,
+    () => {
+      if (!props.device.gcodeLines ) return;
+      renderGCode(props.device.gcodeLines.slice(-1)[0]);
     }
+  );
+});
 
-    const reader = new FileReader();
-    reader.readAsText(file);
-    return new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-            resolve(reader.result as string);
-        };
-        reader.onerror = (error) => {
-            reject(error);
-        };
-    });
-};
+// Clean up resources on unmount
+onUnmounted(() => {
+  if (worker) {
+    worker.terminate();
+    worker = null;
+  }
+  if (preview) {
+    preview.clear();
+    preview = null;
+  }
+});
 </script>
 
 <template>
-    <canvas ref="canvas"></canvas>
+  <canvas ref="canvas"></canvas>
 </template>
 
 <style scoped>
 canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
+  width: 100%;
+  height: 400px;
+  display: block;
 }
 </style>

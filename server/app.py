@@ -1,120 +1,297 @@
-from flask import Flask, jsonify, request, Response, url_for, send_from_directory
+import asyncio
+import threading
+from os import PathLike
 from threading import Thread
-from flask_cors import CORS 
-import os 
-from models.db import db
-from models.printers import Printer
-from models.PrinterStatusService import PrinterStatusService
-from flask_migrate import Migrate
-from dotenv import load_dotenv, set_key
-from controllers.ports import getRegisteredPrinters
+import traceback
+import uuid
+import os
 import shutil
-from flask_socketio import SocketIO
-from datetime import datetime, timedelta
-from sqlalchemy import text
-import json
+import websockets
+from websockets.asyncio.server import Server
+from MyFlaskApp import MyFlaskApp
+from globals import emulator_connections, event_emitter, tabs
+import discord
+from discord.ext import commands
+import certifi
+from datetime import datetime
 from models.config import Config
 
 
+async def websocket_server():
+    async def handle_client(websocket):
+        client_id = str(uuid.uuid4())
+
+        print(f"Emulator websocket connected: {client_id}")
+
+        emulator_connections[client_id] = websocket
+
+        try:
+            while True:
+                message = await websocket.recv()
+                assert isinstance(message, str), f"Received non-string message: {message}, Type: ({type(message)})"
+                event_emitter.emit("message_received", client_id, message)
+                fake_port = None
+                fake_name = None
+                fake_hwid = None
+                if not hasattr(emulator_connections[client_id],"fake_port"):
+                    fake_port = message.split('port":"')[-1].split('",')[0]
+                    if fake_port:
+                        emulator_connections[client_id].fake_port = fake_port
+                    fake_name = message.split('Name":"')[-1].split('",')[0]
+                    if fake_name:
+                        emulator_connections[client_id].fake_name = fake_name
+                    fake_hwid = message.split('Hwid":"')[-1].split('",')[0]
+                    if fake_hwid:
+                        emulator_connections[client_id].fake_hwid = fake_hwid
+                if fake_hwid is not None and fake_name is not None and fake_port is not None:
+                    break
+            while True:
+                message = await websocket.recv()
+                print(f"Received message: {message}")
+                assert isinstance(message, str), f"Received non-string message: {message}, Type: ({type(message)})"
+                event_emitter.emit("message_received", client_id, message)
+        except websockets.exceptions.ConnectionClosed:
+            # Handle disconnection gracefully
+            print(f"Emulator '{client_id}' has been disconnected.")
+        except Exception:
+            # Handle any other exception (unexpected disconnection, etc.)
+            print(f"Error with client {client_id}: {traceback.format_exc()}")
+        finally:
+             if client_id in emulator_connections:
+                del emulator_connections[client_id]
+
+    try:
+        server: Server = await websockets.serve(handle_client, "localhost", 8001)
+        await server.wait_closed()
+    except Exception:
+        print(f"WebSocket server error: {traceback.format_exc()}")
+
+def start_websocket():
+    print("Starting WebSocket server...")
+    asyncio.run(websocket_server())
+
+
+os.environ["SSL_CERT_FILE"] = certifi.where()
+
+websocket_thread = threading.Thread(target=start_websocket, daemon=True)
+websocket_thread.start()
+
 
 # moved this up here so we can pass the app to the PrinterStatusService
-# Basic app setup 
-app = Flask(__name__, static_folder='../client/dist')
-app.config.from_object(__name__) # update application instantly 
+# Basic app setup
+print(f"{tabs()}Starting Flask application...")
+app = MyFlaskApp()
+print(f"{tabs(tab_change=-1)}Flask application started")
 
-# moved this before importing the blueprints so that it can be accessed by the PrinterStatusService
-printer_status_service = PrinterStatusService(app)
+# Set up the bot with the necessary intents
+print("Loading Discord bot config...")
+intents = discord.Intents.default()
+intents.messages = True  # Enable messages
+intents.message_content = True  # Enable message content
 
-# Initialize SocketIO, which will be used to send printer status updates to the frontend
-# and this specific socketit will be used throughout the backend
+bot = commands.Bot(Config['command_prefix'], intents=intents)
 
-if Config.get('environment') == 'production':
-    async_mode = 'eventlet'  # Use 'eventlet' for production
-else:
-    async_mode = 'threading'  # Use 'threading' for development
+class DiscordBot(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-socketio = SocketIO(app, cors_allowed_origins="*", engineio_logger=False, socketio_logger=False, async_mode=async_mode) # make it eventlet on production!
-app.socketio = socketio  # Add the SocketIO object to the app object
+def run_discord_bot():
+    loop = asyncio.new_event_loop()  # Create a new event loop for this thread
+    asyncio.set_event_loop(loop)  # Set it as the current event loop for this thread
 
-# IMPORTING BLUEPRINTS 
-from controllers.ports import ports_bp
-from controllers.jobs import jobs_bp
-from controllers.statusService import status_bp, getStatus 
-from controllers.issues import issue_bp
+    # Add the bot cog
+    @bot.event
+    async def on_ready():
+        print(f'Logged in as {bot.user.name}')
+        if Config['discord_enabled']:
+            channel = bot.get_channel(int(Config['discord_issues_channel']))
+            #await channel.send("Discord bot is online and ready!")
 
-CORS(app)
+    @bot.command()
+    async def testembedformatting(ctx):
+        from models.issues import Issue
+        try:
+            raise Exception("Test issue")
+        except Exception as e:
+            Issue.create_issue("CODE ISSUE: Print Failed: Test Issue", e)
 
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        res = Response()
-        res.headers['X-Content-Type-Options'] = '*'
-        res.headers['Access-Control-Allow-Origin'] = '*'
-        res.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        res.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        return res
-
-# Serve static files
-@app.route('/')
-def serve_static(path='index.html'):
-    return send_from_directory(app.static_folder, path)
-
-@app.route('/assets/<path:filename>')
-def serve_assets(filename):
-    return send_from_directory(os.path.join(app.static_folder, 'assets'), filename)
-
-# start database connection
-load_dotenv()
-basedir = os.path.abspath(os.path.dirname(__file__))
-database_file = os.path.join(basedir, Config.get('database_uri'))
-databaseuri = 'sqlite:///' + database_file
-app.config['SQLALCHEMY_DATABASE_URI'] = databaseuri
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-
-migrate = Migrate(app, db)
-
-# # Register the display_bp Blueprint
-app.register_blueprint(ports_bp)
-app.register_blueprint(jobs_bp)
-app.register_blueprint(status_bp)
-app.register_blueprint(issue_bp)
+    @bot.command()
+    async def testissue(ctx):
+        embed = discord.Embed(title='New Issue Created',
+                description='A issue occurred when running a job',
+                color=discord.Color.red())
+            
+        embed.add_field(name='Issue', value="Issue details here...", inline=False)
+        embed.add_field(name='ID', value="Issue id here...", inline=False)
+            
+        embed.timestamp = datetime.utcnow()
+            
+        await ctx.send(embed=embed)
     
-@app.socketio.on('ping')
-def handle_ping():
-    app.socketio.emit('pong')
+    @bot.command()
+    async def testfile(ctx):
+        roleid = Config['discord_issues_role']
+        role_message = '<@&{role_id}>'.format(role_id=roleid)
+        
+        sync_send_discord_file("../INFO.log", role_message)
+
+    @bot.command()
+    async def testsync(ctx):
+        embed = discord.Embed(title='New Issue Created',
+                              description='A issue occurred when running a job',
+                              color=discord.Color.red())
+
+        embed.add_field(name='Issue', value="Issue details here...", inline=False)
+        embed.add_field(name='ID', value="Issue id here...", inline=False)
+
+        sync_send_discord_embed(embed=embed)
+        await ctx.send("sent!")
+
+    # Start the bot
+    bot.run(Config['discord_token'])
+    
+def start_discord_bot():
+    discord_thread = Thread(target=run_discord_bot)
+    discord_thread.start()
+
+async def send_discord_message(message):
+    if bot.is_ready():
+        channel = bot.get_channel(int(Config['discord_issues_channel']))
+        
+        if channel is not None:
+            await channel.send(message)
+        else:
+            print("Discord channel not found.")
+
+def sync_send_discord_message(message):
+    """
+    Send a Discord message from a synchronous context, interacting with the bot's event loop.
+
+    Parameters:
+        message (str): The message to send.
+    """
+    print("Attempting to send embed to Discord...")
+
+    # Check if the bot is ready
+    if not bot.is_ready():
+        print("Bot is not ready yet.")
+        return
+
+    # Get the Discord channel
+    channel_id = int(Config.get("discord_issues_channel", 0))
+    if not channel_id:
+        print("Discord channel ID is not configured properly.")
+        return
+
+    channel = bot.get_channel(channel_id)
+    if channel is None:
+        print(f"Channel with ID {channel_id} not found or inaccessible.")
+        return
+
+    print(f"Channel {channel_id} found. Attempting to send the embed...")
+
+    try:
+        # Submit the coroutine to the bot's event loop
+        asyncio.run_coroutine_threadsafe(channel.send(message), bot.loop)
+        print("Embed sent successfully!")
+    except Exception as e:
+        print(f"An error occurred while sending the embed: {type(e).__name__} - {e}")
+
+def sync_send_discord_embed(embed):
+    """
+    Send a Discord embed message from a synchronous context, interacting with the bot's event loop.
+
+    :param embed: The embed to send.
+    """
+
+    # Check if the bot is ready
+    if not bot.is_ready():
+        print("Bot is not ready yet.")
+        return
+
+    # Get the Discord channel
+    channel_id = int(Config.get("discord_issues_channel", 0))
+    if not channel_id:
+        print("Discord channel ID is not configured properly.")
+        return
+
+    channel = bot.get_channel(channel_id)
+    if channel is None:
+        print(f"Channel with ID {channel_id} not found or inaccessible.")
+        return
+
+    try:
+        # Submit the coroutine to the bot's event loop
+        asyncio.run_coroutine_threadsafe(channel.send(embed=embed), bot.loop)
+    except Exception as e:
+        print(f"An error occurred while sending the embed: {type(e).__name__} - {e}")
+
+
+# this gets called like
+# await send_discord_file(channel, file_path, "Here's an important file:")
+def sync_send_discord_file(file_path: str | bytes | PathLike, message: str = None):
+    """
+    Sends a file to a specified Discord channel with an optional message.
+    :param str | bytes | PathLike file_path: The path to the file to be uploaded.
+    :param str message: The optional message to send with the file.
+    """
+    # Check if the bot is ready
+    if not bot.is_ready():
+        print("Bot is not ready yet.")
+        return
+
+    # Get the Discord channel
+    channel_id = int(Config.get("discord_issues_channel", 0))
+    if not channel_id:
+        print("Discord channel ID is not configured properly.")
+        return
+
+    channel = bot.get_channel(channel_id)
+    if channel is None:
+        print(f"Channel with ID {channel_id} not found or inaccessible.")
+        return
+
+    try:
+        with open(file_path, 'rb') as f:
+            file = discord.File(f, filename=file_path.split("/")[-1])
+            # Submit the coroutine to the bot's event loop
+            asyncio.run_coroutine_threadsafe(channel.send(message or "", file=file), bot.loop)
+    except Exception as e:
+        print(f"An error occurred while sending the embed: {type(e).__name__} - {e}")
+print("Discord bot configuration loaded")
+
+if Config['discord_enabled']:
+    print("Starting Discord bot...")
+    start_discord_bot()
+    print("Discord bot started")
+else:
+    print("Discord bot is disabled")
 
 # own thread
 with app.app_context():
     try:
-        # Creating printer threads from registered printers on server start 
-        res = getRegisteredPrinters() # gets registered printers from DB 
-        data = res[0].get_json() # converts to JSON 
-        printers_data = data.get("printers", []) # gets the values w/ printer data
-        printer_status_service.create_printer_threads(printers_data)
-        
-        # Create in-memory uploads folder 
-        uploads_folder = os.path.join('../uploads')
-        tempcsv = os.path.join('../tempcsv')
+        # Define directory paths for uploads and tempcsv
+        uploads_folder = os.path.abspath('../uploads')
+        tempcsv = os.path.abspath('../tempcsv')
+        # Check if directories exist and handle them accordingly
+        for folder in [uploads_folder, tempcsv]:
+            if os.path.exists(folder):
+                # Remove the folder and all its contents
+                shutil.rmtree(folder)
+                app.logger.info(f"{folder} removed and will be recreated.")
+            # Recreate the folder
+            os.makedirs(folder)
+            app.logger.info(f"{folder} recreated as an empty directory.")
 
-        if os.path.exists(uploads_folder):
-            # Remove the uploads folder and all its contents
-            shutil.rmtree(uploads_folder)
-            shutil.rmtree(tempcsv)
-
-            # Recreate it as an empty directory
-            os.makedirs(uploads_folder)
-            os.makedirs(tempcsv)
-
-            print("Uploads folder recreated as an empty directory.")
-        else:
-            # Create the uploads folder if it doesn't exist
-            os.makedirs(uploads_folder)
-            os.makedirs(tempcsv)
-            print("Uploads folder created successfully.")  
     except Exception as e:
-        print(f"Unexpected error: {e}")
-            
+        # Log any exceptions for troubleshooting
+        app.handle_errors_and_logging(e)
+
+def run_socketio(app):
+    try:
+        app.socketio.run(app, allow_unsafe_werkzeug=True)
+    except Exception as e:
+        app.handle_errors_and_logging(e)
 
 if __name__ == "__main__":
     # If hits last line in GCode file: 
@@ -122,7 +299,4 @@ if __name__ == "__main__":
         # Before sending to printer, query for status. If error, throw error. 
     # since we are using socketio, we need to use socketio.run instead of app.run
     # which passes the app anyways
-    socketio.run(app, debug=True)  # Replace app.run with socketio.run
-    
-def create_app():
-    return app
+    run_socketio(app)  # Replace app.run with socketio.run

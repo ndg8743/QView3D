@@ -1,13 +1,12 @@
 // ts file to retrieve job information
 import { api } from './ports'
 import { toast } from './toast'
-import { type Device } from '@/model/ports'
+import { printers, type Device } from '@/model/ports'
 import { socket, API_ROOT } from './myFetch'
 import { saveAs } from 'file-saver'
 import { ref } from 'vue'
 
 export const pageSize = ref(10)
-export const isLoading = ref(false)
 // Submit form data
 export const selectedPrinters = ref<Array<Device>>([])
 export const file = ref<File>()
@@ -80,7 +79,7 @@ export async function jobTime(job: Job, printers: any) {
     if (!job.job_server) {
       job.job_server = [0, '00:00:00', '00:00:00', '00:00:00']
 
-      for (const printer of printers.value) {
+      for (const printer of printers) {
         // let time_server = Array(4) // this saves all of the data from the backend.Only changed if there is a pause involved.
         // Here 'printer' represents each Device object in the 'printers' array
         if (printer.queue && printer.queue.length != 0 && printer.queue[0].status != 'inqueue') {
@@ -98,10 +97,10 @@ export async function jobTime(job: Job, printers: any) {
     }
 
     const printerid = job.printerid
-    const printer = printers.value.find((printer: { id: number }) => printer.id === printerid)
+    const printer = printers.find((printer: Device) => printer.id === printerid)
 
     const updateJobTime = () => {
-      if (printer.status !== 'printing') {
+      if (printer?.status !== 'printing') {
         clearInterval(job.timer)
         delete job.timer
         return
@@ -117,9 +116,9 @@ export async function jobTime(job: Job, printers: any) {
       job.job_client!.eta = eta
 
       if (
-        printer.status === 'printing' ||
-        printer.status === 'colorchange' ||
-        printer.status === 'paused'
+        printer?.status === 'printing' ||
+        printer?.status === 'colorchange' ||
+        printer?.status === 'paused'
       ) {
         const now = Date.now()
         const elapsedTime = now - new Date(job.job_server![2]).getTime()
@@ -153,32 +152,35 @@ export async function jobTime(job: Job, printers: any) {
   }
 }
 
-export function setupTimeSocket(printers: any) {
+export function setupTimeSocket(printers: Array<Device>) {
   // Always set up the socket connection and event listener
   socket.value.on('set_time', (data: any) => {
     if (printers) {
-      const job = printers.value
-        .flatMap((printer: { queue: any }) => printer.queue)
-        .find((job: { id: any }) => job?.id === data.job_id)
-
-      if (!job.job_client || !job.job_server) {
-        job.job_client = {
-          total_time: 0,
-          eta: 0,
-          elapsed_time: 0,
-          extra_time: 0,
-          remaining_time: NaN
+      const job = printers
+        .flatMap((printer: Device) => printer.queue)
+        .find((job: Job | undefined) => job?.id === data.job_id)
+      if(job) {
+        if (!job.job_client || !job.job_server) {
+          job.job_client = {
+            total_time: 0,
+            eta: 0,
+            elapsed_time: 0,
+            extra_time: 0,
+            remaining_time: NaN
+          }
+          job.job_server = [0, '00:00:00', '00:00:00', '00:00:00']
         }
-        job.job_server = [0, '00:00:00', '00:00:00', '00:00:00']
-      }
 
-      if (typeof data.new_time === 'number') {
-        job.job_server[data.index] = data.new_time
+        if (typeof data.new_time === 'number') {
+          job.job_server[data.index] = data.new_time
+        } else {
+          job.job_server[data.index] = Date.parse(data.new_time)
+        }
+
+        jobTime(job, printers)
       } else {
-        job.job_server[data.index] = Date.parse(data.new_time)
+        console.error('job is undefined')
       }
-
-      jobTime(job, printers)
     } else {
       console.error('printers or printers.value is undefined')
     }
@@ -187,8 +189,7 @@ export function setupTimeSocket(printers: any) {
 
 async function refetchtime(printerid: number, jobid: number) {
   try {
-    const response = await api('refetchtimedata', { printerid, jobid })
-    return response
+    return await api('refetchtimedata', { printerid, jobid })
   } catch (error) {
     console.error(error)
     toast.error('An error occurred while updating the job status')
@@ -226,10 +227,9 @@ export function useGetJobs() {
       countOnly?: number
     ) {
       try {
-        const response = await api(
+        return await api(
           `getjobs?page=${page}&pageSize=${pageSize}&printerIds=${JSON.stringify(printerIds)}&oldestFirst=${oldestFirst}&searchJob=${encodeURIComponent(searchJob)}&searchCriteria=${encodeURIComponent(searchCriteria)}&searchTicketId=${encodeURIComponent(searchTicketId)}&favoriteOnly=${favoriteOnly}&issueIds=${JSON.stringify(issues)}&startdate=${startdate}&enddate=${enddate}&fromError=${fromError}&countOnly=${countOnly}`
         )
-        return response
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while retrieving the jobs')
@@ -237,8 +237,7 @@ export function useGetJobs() {
     },
     async getFavoriteJobs() {
       try {
-        const response = await api('getfavoritejobs')
-        return response
+        return await api('getfavoritejobs')
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while retrieving the jobs')
@@ -251,8 +250,7 @@ export function useUpdateJobStatus() {
   return {
     async updateJobStatus(jobid: number, status: string) {
       try {
-        const response = await api('assigntoerror', { jobid, status })
-        return response
+        return await api('assigntoerror', { jobid, status })
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while updating the job status')
@@ -370,33 +368,33 @@ export function useRemoveJob() {
   }
 }
 
-export function bumpJobs() {
-  return {
-    async bumpjob(job: Job, printer: Device, choice: number) {
-      try {
-        const printerid = printer.id
-        const jobid = job.id
-        const response = await api('bumpjob', { printerid, jobid, choice })
-        if (response) {
-          if (response.success == false) {
-            toast.error(response.message)
-          } else if (response.success === true) {
-            toast.success(response.message)
-          } else {
-            console.error('Unexpected response:', response)
-            toast.error('Failed to bump job. Unexpected response.')
-          }
-        } else {
-          console.error('Response is undefined or null')
-          toast.error('Failed to bump job. Unexpected response')
-        }
-      } catch (error) {
-        console.error(error)
-        toast.error('An error occurred while bumping the job')
-      }
-    }
-  }
-}
+// export function bumpJobs() {
+//   return {
+//     async bumpjob(job: Job, printer: Device, choice: number) {
+//       try {
+//         const printerid = printer.id
+//         const jobid = job.id
+//         const response = await api('bumpjob', { printerid, jobid, choice })
+//         if (response) {
+//           if (response.success == false) {
+//             toast.error(response.message)
+//           } else if (response.success === true) {
+//             toast.success(response.message)
+//           } else {
+//             console.error('Unexpected response:', response)
+//             toast.error('Failed to bump job. Unexpected response.')
+//           }
+//         } else {
+//           console.error('Response is undefined or null')
+//           toast.error('Failed to bump job. Unexpected response')
+//         }
+//       } catch (error) {
+//         console.error(error)
+//         toast.error('An error occurred while bumping the job')
+//       }
+//     }
+//   }
+// }
 
 export function useReleaseJob() {
   return {
@@ -409,6 +407,8 @@ export function useReleaseJob() {
             toast.error(response.message)
           } else if (response.success === true) {
             toast.success(response.message)
+            const printer = printers!.value!.find((p: Device) => p.id === printerid)
+            if(printer) printer.gcodeLines = []
           } else {
             console.error('Unexpected response:', response)
             toast.error('Failed to release job. Unexpected response.')
@@ -424,12 +424,12 @@ export function useReleaseJob() {
     }
   }
 }
+
 export function useGetGcode() {
   return {
     async getgcode(job: Job) {
       try {
-        const response = await api('getgcode', job)
-        return response
+        return await api('getgcode', job)
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while retrieving the gcode')
@@ -454,14 +454,31 @@ export function useGetJobFile() {
   }
 }
 
+export  function useGetLogFile() {
+    return {
+        async getLogFile(jobid: number) {
+        try {
+            const response = await api(`getlogfile?jobid=${jobid}`)
+            const decodedData = atob(response.file);
+            const byteArray = new Uint8Array(decodedData.split('').map(char => char.charCodeAt(0)));
+            const file = new Blob([byteArray], { type: 'text/plain' });
+            const file_name = response.filename
+            saveAs(file, file_name)
+        } catch (error) {
+            console.error(error)
+            toast.error('An error occurred while retrieving the file')
+        }
+        }
+    }
+}
+
 export function useGetFile() {
   return {
     async getFile(job: Job): Promise<File | undefined> {
       try {
         const jobid = job.id
         const response = await api(`getfile?jobid=${jobid}`)
-        const file = new File([response.file], response.file_name, { type: 'text/plain' })
-        return file
+        return new File([response.file], response.file_name, { type: 'text/plain' })
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while retrieving the file')
@@ -504,7 +521,7 @@ export function useFavoriteJob() {
       try {
         const response = await api(`favoritejob`, { jobid, favorite })
         if (response.success) {
-          job.favorite = favorite ? true : false
+          job.favorite = favorite
         }
         return response
       } catch (error) {
@@ -539,8 +556,7 @@ export function useDeleteJob() {
     async deleteJob(job: Job) {
       const jobid = job?.id
       try {
-        const response = await api(`deletejob`, { jobid })
-        return response
+        return await api(`deletejob`, { jobid })
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while deleting the job')
@@ -553,8 +569,7 @@ export function useStartJob() {
   return {
     async start(jobid: number, printerid: number) {
       try {
-        const response = await api(`startprint`, { jobid, printerid })
-        return response
+        return await api(`startprint`, { jobid, printerid })
       } catch (error) {
         console.error(error)
         toast.error('An error occurred while starting the job')
@@ -626,7 +641,9 @@ export function useDownloadCsv() {
         const response = await download(`downloadcsv`, { allJobs, jobIds })
 
         if (!response.ok) {
-          throw new Error('HTTP error ' + response.status)
+          console.error('An error occurred while downloading the CSV:', 'HTTP error ' + response.status)
+          toast.error('An error occurred while downloading the CSV')
+          return
         }
 
         const blob = await response.blob() // Convert the response to a blob
